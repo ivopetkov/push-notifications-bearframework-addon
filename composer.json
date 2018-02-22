@@ -16,7 +16,8 @@
         "bearframework/bearframework": "0.10.*@beta",
         "ivopetkov/html5-dom-document-php": "0.5.*",
         "ivopetkov/encryption-bearframework-addon": "0.1.*",
-        "ivopetkov/server-requests-bearframework-addon": "0.3.*"
+        "ivopetkov/server-requests-bearframework-addon": "0.3.*",
+        "ivopetkov/locks-bearframework-addon": "0.1.*"
     },
     "require-dev": {
         "phpunit/phpunit": "^4.8"

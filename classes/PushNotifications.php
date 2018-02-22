@@ -19,17 +19,18 @@ class PushNotifications
 
     private $subscriberID = null;
 
-    private function getSubscriberDataKey(string $subscriberID)
-    {
-        $subscriberIDMD5 = md5($subscriberID);
-        return 'ivopetkov-push-notifications/subscribers/subscriber/' . substr($subscriberIDMD5, 0, 2) . '/' . substr($subscriberIDMD5, 2, 2) . '/' . $subscriberIDMD5 . '.json';
-    }
-
+    /**
+     * 
+     * @param string $subscriberID
+     * @param array $subscription
+     */
     public function subscribe(string $subscriberID, array $subscription)
     {
         $app = App::get();
-        $dataKey = $this->getSubscriberDataKey($subscriberID);
-        $data = $app->data->getValue($dataKey);
+        $lockKey = 'notifications-subscriber-' . $subscriberID;
+        $app->locks->acquire($lockKey);
+        $subscriberDataKey = $this->getSubscriberDataKey($subscriberID);
+        $data = $app->data->getValue($subscriberDataKey);
         $data = strlen($data) > 0 ? json_decode($data, true) : [];
         $data['id'] = $subscriberID;
         if (!isset($data['subscriptions'])) {
@@ -38,15 +39,25 @@ class PushNotifications
         $subscriptionID = md5(json_encode($subscription));
         if (!isset($data['subscriptions'][$subscriptionID])) {
             $data['subscriptions'][$subscriptionID] = $subscription;
-            $app->data->set($app->data->make($dataKey, json_encode($data)));
+            $app->data->set($app->data->make($subscriberDataKey, json_encode($data)));
         }
+        $app->locks->release($lockKey);
     }
 
+    /**
+     * 
+     * @param string $subscriberID
+     */
     public function setSubscriberID(string $subscriberID)
     {
         $this->subscriberID = $subscriberID;
     }
 
+    /**
+     * 
+     * @param \BearFramework\App\Response\HTML $response
+     * @param string $onLoad
+     */
     public function apply(\BearFramework\App\Response\HTML $response, string $onLoad = '')
     {
         $app = App::get();
@@ -67,45 +78,50 @@ class PushNotifications
 
     /**
      * 
+     * @param string $subscriberID
+     * @param array $notificationData
      */
     public function send(string $subscriberID, array $notificationData)
     {
         $app = App::get();
-        $dataKey = $this->getSubscriberDataKey($subscriberID);
-        $data = $app->data->getValue($dataKey);
+        $subscriberDataKey = $this->getSubscriberDataKey($subscriberID);
+        $data = $app->data->getValue($subscriberDataKey);
         $data = strlen($data) > 0 ? json_decode($data, true) : [];
         if (isset($data['subscriptions']) && is_array($data['subscriptions'])) {
-            foreach ($data['subscriptions'] as $subscriptionData) {
-                $this->sendNotification($subscriptionData, $notificationData);
+            $subscriptionsToDelete = [];
+            foreach ($data['subscriptions'] as $subscriptionID => $subscription) {
+                $result = $this->sendNotification($subscription, $notificationData);
+                if ($result === 'delete') {
+                    $subscriptionsToDelete[] = $subscriptionID;
+                }
+            }
+
+            if (!empty($subscriptionsToDelete)) {
+                $lockKey = 'notifications-subscriber-' . $subscriberID;
+                $app->locks->acquire($lockKey);
+                $data = $app->data->getValue($subscriberDataKey);
+                foreach ($subscriptionsToDelete as $subscriptionToDeleteID) {
+                    unset($data['subscriptions'][$subscriptionToDeleteID]);
+                }
+                $app->data->set($app->data->make($subscriberDataKey, json_encode($data)));
+                $app->locks->release($lockKey);
             }
         }
     }
 
-    private function getEndpointDataKey(string $endpoint)
-    {
-        $endpointMD5 = md5($endpoint);
-        return '.temp/ivopetkov-push-notifications/endpoints/' . substr($endpointMD5, 0, 2) . '/' . substr($endpointMD5, 2, 2) . '/' . $endpointMD5 . '.json';
-    }
-
-    public function getPendingEndpointData($endpoint)
-    {
-        $app = App::get();
-        $dataKey = $this->getEndpointDataKey($endpoint);
-        $data = $app->data->getValue($dataKey);
-        $data = strlen($data) > 0 ? json_decode($data, true) : [];
-        $app->data->delete($dataKey);
-        return $data;
-    }
-
     /**
      * 
+     * @param array $subscription
+     * @param array $notificationData
+     * @return boolean
+     * @throws \Exception
      */
-    private function sendNotification(array $subscriptionData, array $notificationData)
+    private function sendNotification(array $subscription, array $notificationData)
     {
         $app = App::get();
         $options = $app->addons->get('ivopetkov/push-notifications-bearframework-addon')->options;
 
-        $endpoint = $subscriptionData['endpoint'];
+        $endpoint = $subscription['endpoint'];
 
         $temp = [];
         $temp['title'] = isset($notificationData['title']) ? (string) $notificationData['title'] : '';
@@ -115,11 +131,11 @@ class PushNotifications
         $temp['onClickUrl'] = isset($notificationData['onClickUrl']) ? (string) $notificationData['onClickUrl'] : '';
         $notificationData = $temp;
 
-        $dataKey = $this->getEndpointDataKey($endpoint);
-        $data = $app->data->getValue($dataKey);
+        $endpointDataKey = $this->getEndpointDataKey($endpoint);
+        $data = $app->data->getValue($endpointDataKey);
         $data = strlen($data) > 0 ? json_decode($data, true) : [];
         $data[] = $notificationData;
-        $app->data->set($app->data->make($dataKey, json_encode($data)));
+        $app->data->set($app->data->make($endpointDataKey, json_encode($data)));
 
         $urlParts = parse_url($endpoint);
         if (isset($urlParts['host'], $urlParts['path'])) {
@@ -163,28 +179,58 @@ class PushNotifications
             $response = curl_exec($ch);
             $curlInfo = curl_getinfo($ch);
             curl_close($ch);
-            $result = false;
+            //$app->logger->log('push-notifications-response-error', print_r($subscription, true) . "\n" . $response);
             $statusCode = (int) $curlInfo['http_code'];
             if ($host === 'updates.push.services.mozilla.com' && $statusCode === 201) {
-                $result = true;
+                return true;
             } elseif ($host === 'android.googleapis.com' && $statusCode === 200) {
                 $body = substr($response, $curlInfo['header_size']);
                 $resultData = json_decode($body, true);
                 if (isset($resultData['results'], $resultData['results'][0], $resultData['results'][0]['error']) && $resultData['results'][0]['error'] === 'NotRegistered') {
-                    // todo delete registration
+                    return 'delete';
                 }
-                $result = isset($resultData['success']) && (int) $resultData['success'] === 1;
-            }
-            $app->logger->log('push-notifications-response', $response);
-            if ($result) {
-                return true;
-            } else {
-                $app->logger->log('push-notifications-response-error', $response);
-                return false;
+                return isset($resultData['success']) && (int) $resultData['success'] === 1;
             }
         } else {
-            throw new \Exception('invalidData');
+            return 'delete';
         }
+    }
+
+    /**
+     * 
+     * @param string $endpoint
+     * @return string
+     */
+    private function getEndpointDataKey(string $endpoint): string
+    {
+        $endpointMD5 = md5($endpoint);
+        return '.temp/ivopetkov-push-notifications/endpoints/' . substr($endpointMD5, 0, 2) . '/' . substr($endpointMD5, 2, 2) . '/' . $endpointMD5 . '.json';
+    }
+
+    /**
+     * 
+     * @param string $subscriberID
+     * @return string
+     */
+    private function getSubscriberDataKey(string $subscriberID): string
+    {
+        $subscriberIDMD5 = md5($subscriberID);
+        return 'ivopetkov-push-notifications/subscribers/subscriber/' . substr($subscriberIDMD5, 0, 2) . '/' . substr($subscriberIDMD5, 2, 2) . '/' . $subscriberIDMD5 . '.json';
+    }
+
+    /**
+     * 
+     * @param string $endpoint
+     * @return string
+     */
+    public function getPendingEndpointData(string $endpoint): string
+    {
+        $app = App::get();
+        $endpointDataKey = $this->getEndpointDataKey($endpoint);
+        $data = $app->data->getValue($endpointDataKey);
+        $data = strlen($data) > 0 ? json_decode($data, true) : [];
+        $app->data->delete($endpointDataKey);
+        return $data;
     }
 
 }

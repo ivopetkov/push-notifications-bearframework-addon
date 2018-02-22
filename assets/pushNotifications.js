@@ -19,7 +19,6 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
         if (typeof data[1] !== 'undefined') {
             serviceWorkerFilePath = data[1];
         }
-
     };
 
     var getStatus = function () {
@@ -103,14 +102,9 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
         });
     };
 
-    var subscribe = function () {
-
-    };
-
     return {
         'initialize': initialize,
-        'getStatus': getStatus,
-        'subscribe': subscribe
+        'getStatus': getStatus
     };
 
 }());
