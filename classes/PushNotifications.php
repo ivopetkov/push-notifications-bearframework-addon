@@ -30,12 +30,12 @@ class PushNotifications
      * 
      * @param ?string $title The notification title.
      * @param ?string $body The notification body.
-     * @return \BearFramework\Notifications\Notification
+     * @return \BearFramework\PushNotifications\PushNotification
      */
     public function make(string $title = null, string $body = null): PushNotification
     {
         if (self::$newPushNotificationCache === null) {
-            self::$newPushNotificationCache = new Notification();
+            self::$newPushNotificationCache = new PushNotification();
         }
         $pushNotification = clone(self::$newPushNotificationCache);
         if ($title !== null) {
