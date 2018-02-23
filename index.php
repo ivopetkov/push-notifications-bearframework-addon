@@ -69,9 +69,10 @@ $app->routes
 
 self.addEventListener("notificationclick", function (event) {
     event.notification.close();
-    if (typeof event.notification.data.clickUrl !== "undefined") {
+    var notificationData = event.notification.data;
+    if (typeof notificationData.clickUrl !== "undefined" && notificationData.clickUrl.toString().length > 0) {
         if (clients.openWindow) {
-            return clients.openWindow(event.notification.data.clickUrl);
+            return clients.openWindow(notificationData.clickUrl.toString());
         }
     }
 });');
