@@ -223,7 +223,7 @@ class PushNotifications
      * @param string $endpoint
      * @return string
      */
-    public function getPendingEndpointData(string $endpoint): string
+    public function getPendingEndpointData(string $endpoint): array
     {
         $app = App::get();
         $endpointDataKey = $this->getEndpointDataKey($endpoint);
