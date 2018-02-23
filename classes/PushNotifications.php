@@ -10,6 +10,7 @@
 namespace IvoPetkov\BearFrameworkAddons;
 
 use BearFramework\App;
+use IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification
 
 /**
  *
@@ -18,6 +19,33 @@ class PushNotifications
 {
 
     private $subscriberID = null;
+
+    /**
+     *
+     */
+    private static $newPushNotificationCache = null;
+
+    /**
+     * Constructs a new push notification and returns it.
+     * 
+     * @param ?string $title The notification title.
+     * @param ?string $body The notification body.
+     * @return \BearFramework\Notifications\Notification
+     */
+    public function make(string $title = null, string $body = null): PushNotification
+    {
+        if (self::$newPushNotificationCache === null) {
+            self::$newPushNotificationCache = new Notification();
+        }
+        $pushNotification = clone(self::$newPushNotificationCache);
+        if ($title !== null) {
+            $pushNotification->title = $title;
+        }
+        if ($body !== null) {
+            $pushNotification->body = $body;
+        }
+        return $pushNotification;
+    }
 
     /**
      * 
@@ -79,9 +107,9 @@ class PushNotifications
     /**
      * 
      * @param string $subscriberID
-     * @param array $notificationData
+     * @param \IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification $notification
      */
-    public function send(string $subscriberID, array $notificationData)
+    public function send(string $subscriberID, PushNotification $notification)
     {
         $app = App::get();
         $subscriberDataKey = $this->getSubscriberDataKey($subscriberID);
@@ -90,7 +118,7 @@ class PushNotifications
         if (isset($data['subscriptions']) && is_array($data['subscriptions'])) {
             $subscriptionsToDelete = [];
             foreach ($data['subscriptions'] as $subscriptionID => $subscription) {
-                $result = $this->sendNotification($subscription, $notificationData);
+                $result = $this->sendNotification($subscription, $notification);
                 if ($result === 'delete') {
                     $subscriptionsToDelete[] = $subscriptionID;
                 }
@@ -112,24 +140,25 @@ class PushNotifications
     /**
      * 
      * @param array $subscription
-     * @param array $notificationData
+     * @param array \IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification $notification
      * @return boolean
      * @throws \Exception
      */
-    private function sendNotification(array $subscription, array $notificationData)
+    private function sendNotification(array $subscription, PushNotification $notification)
     {
         $app = App::get();
         $options = $app->addons->get('ivopetkov/push-notifications-bearframework-addon')->options;
 
         $endpoint = $subscription['endpoint'];
 
-        $temp = [];
-        $temp['title'] = isset($notificationData['title']) ? (string) $notificationData['title'] : '';
-        $temp['icon'] = isset($notificationData['icon']) ? (string) $notificationData['icon'] : '';
-        $temp['message'] = isset($notificationData['message']) ? (string) $notificationData['message'] : '';
-        $temp['tag'] = isset($notificationData['tag']) ? (string) $notificationData['tag'] : '';
-        $temp['clickUrl'] = isset($notificationData['clickUrl']) ? (string) $notificationData['clickUrl'] : '';
-        $notificationData = $temp;
+        $notificationData = [];
+        $notificationData['title'] = $notification->title;
+        $notificationData['body'] = $notification->body;
+        $notificationData['icon'] = $notification->icon;
+        $notificationData['badge'] = $notification->badge;
+        $notificationData['tag'] = $notification->tag;
+        $notificationData['clickUrl'] = $notification->clickUrl;
+        $notificationData['requireInteraction'] = $notification->requireInteraction;
 
         $endpointDataKey = $this->getEndpointDataKey($endpoint);
         $data = $app->data->getValue($endpointDataKey);

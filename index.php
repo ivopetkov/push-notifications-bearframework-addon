@@ -13,7 +13,8 @@ $app = App::get();
 $context = $app->context->get(__FILE__);
 
 $context->classes
-        ->add('IvoPetkov\BearFrameworkAddons\PushNotifications', 'classes/PushNotifications.php');
+        ->add('IvoPetkov\BearFrameworkAddons\PushNotifications', 'classes/PushNotifications.php')
+        ->add('IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification', 'classes/PushNotifications/PushNotification.php');
 
 $context->assets
         ->addDir('assets/');
@@ -52,9 +53,11 @@ $app->routes
                             for(var i = 0; i < notificationsCount; i++){
                                 var notificationData = data[i];
                                 var promise = self.registration.showNotification(notificationData.title, {
-                                    "body": notificationData.message,
+                                    "body": notificationData.body,
                                     "icon": notificationData.icon,
+                                    "badge": notificationData.badge,
                                     "tag": notificationData.tag,
+                                    "requireInteraction": notificationData.requireInteraction,
                                     "data": notificationData
                                 });
                             }
