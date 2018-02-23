@@ -128,7 +128,7 @@ class PushNotifications
         $temp['icon'] = isset($notificationData['icon']) ? (string) $notificationData['icon'] : '';
         $temp['message'] = isset($notificationData['message']) ? (string) $notificationData['message'] : '';
         $temp['tag'] = isset($notificationData['tag']) ? (string) $notificationData['tag'] : '';
-        $temp['onClickUrl'] = isset($notificationData['onClickUrl']) ? (string) $notificationData['onClickUrl'] : '';
+        $temp['clickUrl'] = isset($notificationData['clickUrl']) ? (string) $notificationData['clickUrl'] : '';
         $notificationData = $temp;
 
         $endpointDataKey = $this->getEndpointDataKey($endpoint);
