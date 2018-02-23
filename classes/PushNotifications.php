@@ -95,7 +95,7 @@ class PushNotifications
         $initializeData = [];
         $initializeData[] = strlen($this->subscriberID) > 0 ? base64_encode($app->encryption->encrypt(json_encode(['ivopetkov-push-notifications-subscriber-id', $this->subscriberID]))) : '';
         $initializeData[] = $app->urls->get('/ivopetkov-push-notifications-service-worker.js');
-        $scriptHTML = "<script>var script=document.createElement('script');script.src='" . $context->assets->getUrl('assets/pushNotifications.js', ['cacheMaxAge' => 999999999, 'version' => 1]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);</script>";
+        $scriptHTML = "<script>var script=document.createElement('script');script.src='" . $context->assets->getUrl('assets/pushNotifications.js', ['cacheMaxAge' => 999999999, 'version' => 2]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);</script>";
         $manifestHTML = '<html><head><link rel="manifest" href="' . $app->urls->get('/ivopetkov-push-notifications-manifest.json') . '"></head></html>';
         $dom->insertHTMLMulti([
             ['source' => $scriptHTML],
