@@ -10,7 +10,7 @@
 namespace IvoPetkov\BearFrameworkAddons;
 
 use BearFramework\App;
-use IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification
+use IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification;
 
 /**
  *
