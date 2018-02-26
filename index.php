@@ -93,23 +93,33 @@ self.addEventListener("notificationclick", function (event) {
 //    }
 //});
 
-$app->serverRequests
-        ->add('ivopetkov-push-notifications-subscribe', function($data) use ($app) {
-            if (isset($data['endpoint'], $data['key'], $data['authSecret'])) {
-                $subscriptionData = [];
-                $subscriptionData['endpoint'] = $data['endpoint'];
-                $subscriptionData['key'] = $data['key'];
-                $subscriptionData['authSecret'] = $data['authSecret'];
-                $subscriberKey = isset($data['subscriberKey']) ? base64_decode($data['subscriberKey']) : '';
-                $subscriberIDData = $app->encryption->decrypt((string) $subscriberKey);
-                if (strlen($subscriberIDData) > 0) {
-                    $subscriberIDData = json_decode($subscriberIDData, true);
-                    if (is_array($subscriberIDData) && isset($subscriberIDData[0], $subscriberIDData[1]) && $subscriberIDData[0] === 'ivopetkov-push-notifications-subscriber-id') {
-                        $subscriberID = (string) $subscriberIDData[1];
-                        $app->pushNotifications->subscribe($subscriberID, $subscriptionData);
-                        return '1';
+$updateServerRequestSubscription = function($data, $subscribe)use ($app) {
+    if (isset($data['subscription'], $data['subscriberKey'])) {
+        $subscription = json_decode($data['subscription'], true);
+        if (is_array($subscription)) {
+            $subscriberKey = base64_decode($data['subscriberKey']);
+            $subscriberIDData = $app->encryption->decrypt((string) $subscriberKey);
+            if (strlen($subscriberIDData) > 0) {
+                $subscriberIDData = json_decode($subscriberIDData, true);
+                if (is_array($subscriberIDData) && isset($subscriberIDData[0], $subscriberIDData[1]) && $subscriberIDData[0] === 'ivopetkov-push-notifications-subscriber-id') {
+                    $subscriberID = (string) $subscriberIDData[1];
+                    if ($subscribe) {
+                        $app->pushNotifications->subscribe($subscriberID, $subscription);
+                    } else {
+                        $app->pushNotifications->unsubscribe($subscriberID, $subscription);
                     }
+                    return '1';
                 }
             }
-            return '0';
+        }
+    }
+    return '0';
+};
+
+$app->serverRequests
+        ->add('ivopetkov-push-notifications-subscribe', function($data) use ($updateServerRequestSubscription) {
+            return $updateServerRequestSubscription($data, true);
+        })
+        ->add('ivopetkov-push-notifications-unsubscribe', function($data) use ($updateServerRequestSubscription) {
+            return $updateServerRequestSubscription($data, false);
         });

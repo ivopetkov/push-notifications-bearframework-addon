@@ -54,6 +54,9 @@ class PushNotifications
      */
     public function subscribe(string $subscriberID, array $subscription)
     {
+        if (!isset($subscription['endpoint'])) {
+            return;
+        }
         $app = App::get();
         $lockKey = 'notifications-subscriber-' . $subscriberID;
         $app->locks->acquire($lockKey);
@@ -64,10 +67,38 @@ class PushNotifications
         if (!isset($data['subscriptions'])) {
             $data['subscriptions'] = [];
         }
+        ksort($subscription);
         $subscriptionID = md5(json_encode($subscription));
         if (!isset($data['subscriptions'][$subscriptionID])) {
             $data['subscriptions'][$subscriptionID] = $subscription;
             $app->data->set($app->data->make($subscriberDataKey, json_encode($data)));
+        }
+        $app->locks->release($lockKey);
+    }
+
+    /**
+     * 
+     * @param string $subscriberID
+     * @param array $subscription
+     */
+    public function unsubscribe(string $subscriberID, array $subscription)
+    {
+        if (!isset($subscription['endpoint'])) {
+            return;
+        }
+        $app = App::get();
+        $lockKey = 'notifications-subscriber-' . $subscriberID;
+        $app->locks->acquire($lockKey);
+        $subscriberDataKey = $this->getSubscriberDataKey($subscriberID);
+        $data = $app->data->getValue($subscriberDataKey);
+        $data = strlen($data) > 0 ? json_decode($data, true) : [];
+        if (isset($data['subscriptions'])) {
+            ksort($subscription);
+            $subscriptionID = md5(json_encode($subscription));
+            if (isset($data['subscriptions'][$subscriptionID])) {
+                unset($data['subscriptions'][$subscriptionID]);
+                $app->data->set($app->data->make($subscriberDataKey, json_encode($data)));
+            }
         }
         $app->locks->release($lockKey);
     }
