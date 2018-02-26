@@ -264,7 +264,7 @@ class PushNotifications
     private function getEndpointDataKey(string $endpoint): string
     {
         $endpointMD5 = md5($endpoint);
-        return '.temp/ivopetkov-push-notifications/endpoints/' . substr($endpointMD5, 0, 2) . '/' . substr($endpointMD5, 2, 2) . '/' . $endpointMD5 . '.json';
+        return '.temp/push-notifications/endpoints/' . substr($endpointMD5, 0, 2) . '/' . substr($endpointMD5, 2, 2) . '/' . $endpointMD5 . '.json';
     }
 
     /**
@@ -275,7 +275,7 @@ class PushNotifications
     private function getSubscriberDataKey(string $subscriberID): string
     {
         $subscriberIDMD5 = md5($subscriberID);
-        return 'ivopetkov-push-notifications/subscribers/subscriber/' . substr($subscriberIDMD5, 0, 2) . '/' . substr($subscriberIDMD5, 2, 2) . '/' . $subscriberIDMD5 . '.json';
+        return 'push-notifications/subscribers/subscriber/' . substr($subscriberIDMD5, 0, 2) . '/' . substr($subscriberIDMD5, 2, 2) . '/' . $subscriberIDMD5 . '.json';
     }
 
     /**
