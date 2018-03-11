@@ -52,14 +52,38 @@ $app->routes
                             var notificationsCount = data.length;
                             for(var i = 0; i < notificationsCount; i++){
                                 var notificationData = data[i];
-                                var promise = self.registration.showNotification(notificationData.title, {
-                                    "body": notificationData.body,
-                                    "icon": notificationData.icon,
-                                    "badge": notificationData.badge,
-                                    "tag": notificationData.tag,
-                                    "requireInteraction": notificationData.requireInteraction,
-                                    "data": notificationData
-                                });
+                                var options = {};
+                                if(typeof notificationData.body !== "undefined"){
+                                    var body = notificationData.body.toString();
+                                    if(body.length > 0){
+                                        options["body"] = body;
+                                    }
+                                }
+                                if(typeof notificationData.icon !== "undefined"){
+                                    var icon = notificationData.icon.toString();
+                                    if(icon.length > 0){
+                                        options["icon"] = icon;
+                                    }
+                                }
+                                if(typeof notificationData.badge !== "undefined"){
+                                    var badge = notificationData.badge.toString();
+                                    if(badge.length > 0){
+                                        options["badge"] = badge;
+                                    }
+                                }
+                                if(typeof notificationData.tag !== "undefined"){
+                                    var tag = notificationData.tag.toString();
+                                    if(tag.length > 0){
+                                        options["tag"] = tag;
+                                    }
+                                }
+                                if(typeof notificationData.requireInteraction !== "undefined"){
+                                    if(notificationData.requireInteraction === true){
+                                        options["requireInteraction"] = true;
+                                    }
+                                }
+                                options["data"] = notificationData;
+                                var promise = self.registration.showNotification(notificationData.title, options);
                             }
                             promises.push(promise);
                             return Promise.all(promises);
@@ -73,9 +97,12 @@ $app->routes
 self.addEventListener("notificationclick", function (event) {
     event.notification.close();
     var notificationData = event.notification.data;
-    if (typeof notificationData.clickUrl !== "undefined" && notificationData.clickUrl.toString().length > 0) {
-        if (clients.openWindow) {
-            return clients.openWindow(notificationData.clickUrl.toString());
+    if (typeof notificationData.clickUrl !== "undefined") {
+        var clickUrl = notificationData.clickUrl.toString();
+        if(clickUrl.length > 0){
+            if (clients.openWindow) {
+                return clients.openWindow(clickUrl);
+            }
         }
     }
 });');
