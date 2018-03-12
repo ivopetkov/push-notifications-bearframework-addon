@@ -53,25 +53,25 @@ $app->routes
                             for(var i = 0; i < notificationsCount; i++){
                                 var notificationData = data[i];
                                 var options = {};
-                                if(typeof notificationData.body !== "undefined"){
+                                if(typeof notificationData.body !== "undefined" && notificationData.body !== null){
                                     var body = notificationData.body.toString();
                                     if(body.length > 0){
                                         options["body"] = body;
                                     }
                                 }
-                                if(typeof notificationData.icon !== "undefined"){
+                                if(typeof notificationData.icon !== "undefined" && notificationData.icon !== null){
                                     var icon = notificationData.icon.toString();
                                     if(icon.length > 0){
                                         options["icon"] = icon;
                                     }
                                 }
-                                if(typeof notificationData.badge !== "undefined"){
+                                if(typeof notificationData.badge !== "undefined" && notificationData.badge !== null){
                                     var badge = notificationData.badge.toString();
                                     if(badge.length > 0){
                                         options["badge"] = badge;
                                     }
                                 }
-                                if(typeof notificationData.tag !== "undefined"){
+                                if(typeof notificationData.tag !== "undefined" && notificationData.tag !== null){
                                     var tag = notificationData.tag.toString();
                                     if(tag.length > 0){
                                         options["tag"] = tag;
@@ -97,7 +97,7 @@ $app->routes
 self.addEventListener("notificationclick", function (event) {
     event.notification.close();
     var notificationData = event.notification.data;
-    if (typeof notificationData.clickUrl !== "undefined") {
+    if (typeof notificationData.clickUrl !== "undefined" && notificationData.clickUrl !== null) {
         var clickUrl = notificationData.clickUrl.toString();
         if(clickUrl.length > 0){
             if (clients.openWindow) {
