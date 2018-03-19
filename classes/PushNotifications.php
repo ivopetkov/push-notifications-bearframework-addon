@@ -152,7 +152,7 @@ class PushNotifications
      */
     public function send(string $subscriberID, PushNotification $notification, $options = []): void
     {
-        if (isset($options['subscriptionIDs']) && !is_array(isset($options['subscriptionIDs']))) {
+        if (isset($options['subscriptionIDs']) && !is_array($options['subscriptionIDs'])) {
             throw new \Exception('The subscriptionIDs option must be of type array.');
         }
         $subscriptionIDs = isset($options['subscriptionIDs']) ? $options['subscriptionIDs'] : null;
