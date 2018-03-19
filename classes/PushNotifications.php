@@ -148,22 +148,17 @@ class PushNotifications
         $data = strlen($data) > 0 ? json_decode($data, true) : [];
         if (isset($data['subscriptions']) && is_array($data['subscriptions'])) {
             $subscriptionsToDelete = [];
-            foreach ($data['subscriptions'] as $subscriptionID => $subscription) {
+            foreach ($data['subscriptions'] as $subscription) {
                 $result = $this->sendNotification($subscription, $notification);
                 if ($result === 'delete') {
-                    $subscriptionsToDelete[] = $subscriptionID;
+                    $subscriptionsToDelete[] = $subscription;
                 }
             }
 
             if (!empty($subscriptionsToDelete)) {
-                $lockKey = 'notifications-subscriber-' . $subscriberID;
-                $app->locks->acquire($lockKey);
-                $data = $app->data->getValue($subscriberDataKey);
-                foreach ($subscriptionsToDelete as $subscriptionToDeleteID) {
-                    unset($data['subscriptions'][$subscriptionToDeleteID]);
+                foreach ($subscriptionsToDelete as $subscription) {
+                    $this->unsubscribe($subscriberID, $subscription);
                 }
-                $app->data->set($app->data->make($subscriberDataKey, json_encode($data)));
-                $app->locks->release($lockKey);
             }
         }
     }
