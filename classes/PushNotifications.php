@@ -48,76 +48,84 @@ class PushNotifications
     }
 
     /**
+     * Registers a new subscription for the subscriber specified.
      * 
-     * @param string $subscriberID
-     * @param array $subscription
+     * @param string $subscriberID The subscriber ID. The subscriber ID.
+     * @param array $subscription The subscription data. The subscription data.
+     * @return string Returns the subscription ID.
      */
-    public function subscribe(string $subscriberID, array $subscription)
+    public function subscribe(string $subscriberID, array $subscription): string
     {
-        if (!isset($subscription['endpoint'])) {
-            return;
-        }
         $app = App::get();
         $lockKey = 'notifications-subscriber-' . $subscriberID;
         $app->locks->acquire($lockKey);
-        $subscriberDataKey = $this->getSubscriberDataKey($subscriberID);
-        $data = $app->data->getValue($subscriberDataKey);
-        $data = strlen($data) > 0 ? json_decode($data, true) : [];
-        $data['id'] = $subscriberID;
-        if (!isset($data['subscriptions'])) {
-            $data['subscriptions'] = [];
-        }
+        $data = $this->getSubscriberData($subscriberID);
         ksort($subscription);
         $subscriptionID = md5(json_encode($subscription));
         if (!isset($data['subscriptions'][$subscriptionID])) {
             $data['subscriptions'][$subscriptionID] = $subscription;
-            $app->data->set($app->data->make($subscriberDataKey, json_encode($data)));
+            $this->setSubscriberData($subscriberID, $data);
         }
         $app->locks->release($lockKey);
+        return $subscriptionID;
     }
 
     /**
+     * Deletes the subscription specified.
      * 
-     * @param string $subscriberID
-     * @param array $subscription
+     * @param string $subscriberID The subscriber ID.
+     * @param string $subscriptionID The subscription ID to delete.
      */
-    public function unsubscribe(string $subscriberID, array $subscription)
+    public function unsubscribe(string $subscriberID, string $subscriptionID): void
     {
-        if (!isset($subscription['endpoint'])) {
-            return;
-        }
         $app = App::get();
         $lockKey = 'notifications-subscriber-' . $subscriberID;
         $app->locks->acquire($lockKey);
-        $subscriberDataKey = $this->getSubscriberDataKey($subscriberID);
-        $data = $app->data->getValue($subscriberDataKey);
-        $data = strlen($data) > 0 ? json_decode($data, true) : [];
-        if (isset($data['subscriptions'])) {
-            ksort($subscription);
-            $subscriptionID = md5(json_encode($subscription));
-            if (isset($data['subscriptions'][$subscriptionID])) {
-                unset($data['subscriptions'][$subscriptionID]);
-                $app->data->set($app->data->make($subscriberDataKey, json_encode($data)));
-            }
+        $data = $this->getSubscriberData($subscriberID);
+        if (isset($data['subscriptions'][$subscriptionID])) {
+            unset($data['subscriptions'][$subscriptionID]);
+            $this->setSubscriberData($subscriberID, $data);
         }
         $app->locks->release($lockKey);
     }
 
     /**
+     * Returns the subscription ID for the subscription specified.
      * 
-     * @param string $subscriberID
+     * @param string $subscriberID The subscriber ID.
+     * @param array $subscription The subscription data.
+     * @return ?string Returns the subscription ID or null if not found.
      */
-    public function setSubscriberID(string $subscriberID)
+    public function getSubscriptionID(string $subscriberID, array $subscription): string//?????
+    {
+        $data = $this->getSubscriberData($subscriberID);
+        ksort($subscription);
+        $subscriptionJSON = json_encode($subscription);
+        foreach ($data['subscriptions'] as $subscriptionID => $otherSubscription) {
+            if (json_encode($otherSubscription) === $subscriptionJSON) {
+                return $subscriptionID;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Sets a new subscriber for the current request.
+     * 
+     * @param string $subscriberID The subscriber ID.
+     */
+    public function setSubscriberID(string $subscriberID): void
     {
         $this->subscriberID = $subscriberID;
     }
 
     /**
+     * Applies the push notifications HTML to the response specified.
      * 
-     * @param \BearFramework\App\Response\HTML $response
-     * @param string $onLoad
+     * @param \BearFramework\App\Response\HTML $response The response object.
+     * @param string $onLoad Code to execute on library initialize.
      */
-    public function apply(\BearFramework\App\Response\HTML $response, string $onLoad = '')
+    public function apply(\BearFramework\App\Response\HTML $response, string $onLoad = ''): void
     {
         $app = App::get();
         $context = $app->context->get(__FILE__);
@@ -126,7 +134,7 @@ class PushNotifications
         $initializeData = [];
         $initializeData[] = strlen($this->subscriberID) > 0 ? base64_encode($app->encryption->encrypt(json_encode(['ivopetkov-push-notifications-subscriber-id', $this->subscriberID]))) : '';
         $initializeData[] = $app->urls->get('/ivopetkov-push-notifications-service-worker.js');
-        $scriptHTML = "<script>var script=document.createElement('script');script.src='" . $context->assets->getUrl('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 1]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);</script>";
+        $scriptHTML = "<script>var script=document.createElement('script');script.src='" . $context->assets->getUrl('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 2]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);</script>";
         $manifestHTML = '<html><head><link rel="manifest" href="' . $app->urls->get('/ivopetkov-push-notifications-manifest.json') . '"></head></html>';
         $dom->insertHTMLMulti([
             ['source' => $scriptHTML],
@@ -136,38 +144,42 @@ class PushNotifications
     }
 
     /**
+     * Sends a new push notification to the subscriber specified.
      * 
-     * @param string $subscriberID
-     * @param \IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification $notification
+     * @param string $subscriberID The subscriber ID.
+     * @param \IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification $notification The push notification to send.
+     * @param array $options Available values: subscriptionIDs=>[]
      */
-    public function send(string $subscriberID, PushNotification $notification)
+    public function send(string $subscriberID, PushNotification $notification, $options = []): void
     {
-        $app = App::get();
-        $subscriberDataKey = $this->getSubscriberDataKey($subscriberID);
-        $data = $app->data->getValue($subscriberDataKey);
-        $data = strlen($data) > 0 ? json_decode($data, true) : [];
-        if (isset($data['subscriptions']) && is_array($data['subscriptions'])) {
-            $subscriptionsToDelete = [];
-            foreach ($data['subscriptions'] as $subscription) {
-                $result = $this->sendNotification($subscription, $notification);
-                if ($result === 'delete') {
-                    $subscriptionsToDelete[] = $subscription;
+        if (isset($options['subscriptionIDs']) && !is_array(isset($options['subscriptionIDs']))) {
+            throw new \Exception('The subscriptionIDs option must be of type array.');
+        }
+        $subscriptionIDs = isset($options['subscriptionIDs']) ? $options['subscriptionIDs'] : null;
+        $data = $this->getSubscriberData($subscriberID);
+        $subscriptionsIDsToDelete = [];
+        foreach ($data['subscriptions'] as $subscriptionID => $subscription) {
+            if ($subscriptionIDs !== null) {
+                if (array_search($subscriptionID, $subscriptionIDs) === false) {
+                    continue;
                 }
             }
-
-            if (!empty($subscriptionsToDelete)) {
-                foreach ($subscriptionsToDelete as $subscription) {
-                    $this->unsubscribe($subscriberID, $subscription);
-                }
+            $result = $this->sendNotification($subscription, $notification);
+            if ($result === 'delete') {
+                $subscriptionsIDsToDelete[] = $subscriptionID;
             }
+        }
+        foreach ($subscriptionsIDsToDelete as $subscriptionID) {
+            $this->unsubscribe($subscriberID, $subscriptionID);
         }
     }
 
     /**
+     * Sends a push notification to a specific subscription.
      * 
-     * @param array $subscription
-     * @param array \IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification $notification
-     * @return boolean
+     * @param array $subscription The subscription data.
+     * @param array \IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification $notification The push notification to send.
+     * @return mixed
      * @throws \Exception
      */
     private function sendNotification(array $subscription, PushNotification $notification)
@@ -264,13 +276,47 @@ class PushNotifications
 
     /**
      * 
-     * @param string $subscriberID
+     * @param string $subscriberID The subscriber ID.
      * @return string
      */
     private function getSubscriberDataKey(string $subscriberID): string
     {
         $subscriberIDMD5 = md5($subscriberID);
         return 'push-notifications/subscribers/subscriber/' . substr($subscriberIDMD5, 0, 2) . '/' . substr($subscriberIDMD5, 2, 2) . '/' . $subscriberIDMD5 . '.json';
+    }
+
+    /**
+     * 
+     * @param string $subscriberID
+     * @return array
+     */
+    private function getSubscriberData(string $subscriberID): array
+    {
+        $app = App::get();
+        $subscriberDataKey = $this->getSubscriberDataKey($subscriberID);
+        $data = $app->data->getValue($subscriberDataKey);
+        $data = strlen($data) > 0 ? json_decode($data, true) : [];
+        $data['id'] = $subscriberID;
+        if (!isset($data['subscriptions'])) {
+            $data['subscriptions'] = [];
+        }
+        return $data;
+    }
+
+    /**
+     * 
+     * @param string $subscriberID
+     * @param data $data
+     */
+    private function setSubscriberData(string $subscriberID, array $data): void
+    {
+        $app = App::get();
+        $subscriberDataKey = $this->getSubscriberDataKey($subscriberID);
+        if (empty($data['subscriptions'])) {
+            $app->data->delete($subscriberDataKey);
+        } else {
+            $app->data->set($app->data->make($subscriberDataKey, json_encode($data)));
+        }
     }
 
     /**

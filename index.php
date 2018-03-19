@@ -120,7 +120,7 @@ self.addEventListener("notificationclick", function (event) {
 //    }
 //});
 
-$updateServerRequestSubscription = function($data, $subscribe)use ($app) {
+$updateServerRequestSubscription = function($data, $subscribe) use ($app) {
     if (isset($data['subscription'], $data['subscriberKey'])) {
         $subscription = json_decode($data['subscription'], true);
         if (is_array($subscription)) {
@@ -131,16 +131,20 @@ $updateServerRequestSubscription = function($data, $subscribe)use ($app) {
                 if (is_array($subscriberIDData) && isset($subscriberIDData[0], $subscriberIDData[1]) && $subscriberIDData[0] === 'ivopetkov-push-notifications-subscriber-id') {
                     $subscriberID = (string) $subscriberIDData[1];
                     if ($subscribe) {
-                        $app->pushNotifications->subscribe($subscriberID, $subscription);
+                        $subscriptionID = $app->pushNotifications->subscribe($subscriberID, $subscription);
+                        return json_encode(['status' => 'ok', 'subscriptionID' => $subscriptionID]);
                     } else {
-                        $app->pushNotifications->unsubscribe($subscriberID, $subscription);
+                        $subscriptionID = $app->pushNotifications->getSubscriptionID($subscriberID, $subscription);
+                        if ($subscriptionID !== null) {
+                            $app->pushNotifications->unsubscribe($subscriberID, $subscriptionID);
+                        }
+                        return json_encode(['status' => 'ok']);
                     }
-                    return '1';
                 }
             }
         }
     }
-    return '0';
+    return '{}';
 };
 
 $app->serverRequests

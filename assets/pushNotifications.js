@@ -35,11 +35,16 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
             };
         }
         return new Promise(function (resolve, reject) {
-            var respond = function (code, message) {
+            var respond = function (code, message, data) {
                 var status = {
                     'code': code,
                     'message': message
                 };
+                if (typeof data !== 'undefined') {
+                    for (var k in data) {
+                        status[k] = data[k];
+                    }
+                }
                 resolve(status);
             };
             if (subscriberKey === null || subscriberKey.length === 0) {
@@ -86,8 +91,9 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                         'subscription': getSubscriptionServerData(subscription),
                                                         'subscriberKey': subscriberKey
                                                     }, function (response) {
-                                                        if (response === '1') {
-                                                            respond('SUBSCRIBED', 'The subscription is OK!');
+                                                        response = JSON.parse(response);
+                                                        if (typeof response.status !== 'undefined' && response.status === 'ok') {
+                                                            respond('SUBSCRIBED', 'The subscription is OK!', {'subscriptionID': response.subscriptionID});
                                                         } else {
                                                             respond('UNKNOWN', 'Cannot subsribe on the server!');
                                                         }
@@ -104,7 +110,8 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                                     'subscription': subscriptionServerData,
                                                                     'subscriberKey': subscriberKey
                                                                 }, function (response) {
-                                                                    if (response === '1') {
+                                                                    response = JSON.parse(response);
+                                                                    if (typeof response.status !== 'undefined' && response.status === 'ok') {
                                                                         respond('UNSUBSCRIBED', 'Unsubscribe successful!');
                                                                     } else {
                                                                         respond('UNKNOWN', 'Cannot unsubsribe from the server!');
