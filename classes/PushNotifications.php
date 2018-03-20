@@ -96,7 +96,7 @@ class PushNotifications
      * @param array $subscription The subscription data.
      * @return ?string Returns the subscription ID or null if not found.
      */
-    public function getSubscriptionID(string $subscriberID, array $subscription): string//?????
+    public function getSubscriptionID(string $subscriberID, array $subscription): ?string
     {
         $data = $this->getSubscriberData($subscriberID);
         ksort($subscription);
