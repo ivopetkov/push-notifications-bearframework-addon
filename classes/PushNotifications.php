@@ -190,12 +190,22 @@ class PushNotifications
         $endpoint = $subscription['endpoint'];
 
         $notificationData = [];
-        $notificationData['title'] = $notification->title;
-        $notificationData['body'] = $notification->body;
-        $notificationData['icon'] = $notification->icon;
-        $notificationData['badge'] = $notification->badge;
-        $notificationData['tag'] = $notification->tag;
-        $notificationData['clickUrl'] = $notification->clickUrl;
+        $notificationData['title'] = (string) $notification->title;
+        if (strlen($notification->body) > 0) {
+            $notificationData['body'] = (string) $notification->body;
+        }
+        if (strlen($notification->icon) > 0) {
+            $notificationData['icon'] = (string) $notification->icon;
+        }
+        if (strlen($notification->badge) > 0) {
+            $notificationData['badge'] = (string) $notification->badge;
+        }
+        if (strlen($notification->tag) > 0) {
+            $notificationData['tag'] = (string) $notification->tag;
+        }
+        if (strlen($notification->clickUrl) > 0) {
+            $notificationData['clickUrl'] = (string) $notification->clickUrl;
+        }
         $notificationData['requireInteraction'] = $notification->requireInteraction;
 
         $endpointDataKey = $this->getEndpointDataKey($endpoint);
