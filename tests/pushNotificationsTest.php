@@ -10,7 +10,7 @@
 /**
  * @runTestsInSeparateProcesses
  */
-class PushNotificationsTest extends BearFrameworkAddonTestCase
+class PushNotificationsTest extends BearFramework\AddonTests\PHPUnitTestCase
 {
 
     /**

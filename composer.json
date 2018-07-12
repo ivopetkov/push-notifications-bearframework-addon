@@ -20,7 +20,8 @@
         "ivopetkov/locks-bearframework-addon": "0.1.*"
     },
     "require-dev": {
-        "phpunit/phpunit": "^4.8"
+        "bearframework/addon-tests": "0.1.*",
+        "phpunit/phpunit": "7.*"
     },
     "autoload": {
         "files": ["autoload.php"]
