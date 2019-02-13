@@ -11,6 +11,7 @@ namespace IvoPetkov\BearFrameworkAddons;
 
 use BearFramework\App;
 use IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification;
+use IvoPetkov\HTML5DOMDocument;
 
 /**
  *
@@ -128,13 +129,13 @@ class PushNotifications
     public function apply(\BearFramework\App\Response\HTML $response, string $onLoad = ''): void
     {
         $app = App::get();
-        $context = $app->context->get(__FILE__);
-        $dom = new \IvoPetkov\HTML5DOMDocument();
-        $dom->loadHTML($response->content);
+        $context = $app->contexts->get(__FILE__);
+        $dom = new HTML5DOMDocument();
+        $dom->loadHTML($response->content, HTML5DOMDocument::ALLOW_DUPLICATE_IDS);
         $initializeData = [];
         $initializeData[] = strlen($this->subscriberID) > 0 ? base64_encode($app->encryption->encrypt(json_encode(['ivopetkov-push-notifications-subscriber-id', $this->subscriberID]))) : '';
         $initializeData[] = $app->urls->get('/ivopetkov-push-notifications-service-worker.js');
-        $scriptHTML = "<script>var script=document.createElement('script');script.src='" . $context->assets->getUrl('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 2]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);</script>";
+        $scriptHTML = "<script>var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 2]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);</script>";
         $manifestHTML = '<html><head><link rel="manifest" href="' . $app->urls->get('/ivopetkov-push-notifications-manifest.json') . '"></head></html>';
         $dom->insertHTMLMulti([
             ['source' => $scriptHTML],

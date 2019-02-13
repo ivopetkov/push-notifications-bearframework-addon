@@ -10,11 +10,11 @@
 use BearFramework\App;
 
 $app = App::get();
-$context = $app->context->get(__FILE__);
+$context = $app->contexts->get(__FILE__);
 
 $context->classes
         ->add('IvoPetkov\BearFrameworkAddons\PushNotifications', 'classes/PushNotifications.php')
-        ->add('IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification', 'classes/PushNotifications/PushNotification.php');
+        ->add('IvoPetkov\BearFrameworkAddons\PushNotifications\*', 'classes/PushNotifications/*.php');
 
 $context->assets
         ->addDir('assets/');

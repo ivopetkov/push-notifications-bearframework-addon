@@ -13,14 +13,15 @@
     ],
     "require": {
         "php": ">=7.1.0",
-        "bearframework/bearframework": "0.10.*",
-        "ivopetkov/html5-dom-document-php": "0.5.*|0.6.*|1.*",
+        "bearframework/bearframework": "0.11.*",
+        "ivopetkov/html5-dom-document-php": "2.*",
+        "ivopetkov/data-object": "0.6.*",
         "ivopetkov/encryption-bearframework-addon": "0.1.*",
         "ivopetkov/server-requests-bearframework-addon": "0.3.*",
         "ivopetkov/locks-bearframework-addon": "0.1.*"
     },
     "require-dev": {
-        "bearframework/addon-tests": "0.1.*",
+        "bearframework/addon-tests": "0.2.*",
         "phpunit/phpunit": "7.*"
     },
     "autoload": {
