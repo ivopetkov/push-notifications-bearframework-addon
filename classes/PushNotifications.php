@@ -20,11 +20,108 @@ class PushNotifications
 {
 
     private $subscriberID = null;
+    private $config = [];
 
     /**
      *
      */
     private static $newPushNotificationCache = null;
+
+    /**
+     * 
+     * @param array $config
+     * @return void
+     */
+    public function initialize(array $config): void
+    {
+        $this->config = $config;
+
+        $app = App::get();
+        $app->routes
+                ->add('/ivopetkov-push-notifications-data', function() use ($app) {
+                    $endpoint = $app->request->query->getValue('endpoint');
+                    $result = [];
+                    if (strlen($endpoint) > 0) {
+                        $result = $app->pushNotifications->getPendingEndpointData($endpoint);
+                    }
+                    return new App\Response\JSON(json_encode($result));
+                })
+                ->add('/ivopetkov-push-notifications-manifest.json', function() use ($app) {
+                    return new App\Response\JSON(json_encode([
+                                'gcm_sender_id' => (isset($this->config['googleCloudMessagingSenderID']) ? $this->config['googleCloudMessagingSenderID'] : ''),
+                                'gcm_user_visible_only' => true
+                    ]));
+                })
+                ->add('/ivopetkov-push-notifications-service-worker.js', function() use ($app) {
+                    $response = new App\Response('self.addEventListener("push", function (event) {
+    event.waitUntil(
+        self.registration.pushManager.getSubscription().then(
+            function (subscription) {
+                return fetch("' . $app->urls->get('/ivopetkov-push-notifications-data') . '?endpoint=" + encodeURIComponent(subscription.endpoint)).then(function (response) {
+                    if (response.status === 200) {
+                        return response.json().then(function (data) {
+                            var promises = [];
+                            var notificationsCount = data.length;
+                            for(var i = 0; i < notificationsCount; i++){
+                                var notificationData = data[i];
+                                var options = {};
+                                if(typeof notificationData.body !== "undefined" && notificationData.body !== null){
+                                    var body = notificationData.body.toString();
+                                    if(body.length > 0){
+                                        options["body"] = body;
+                                    }
+                                }
+                                if(typeof notificationData.icon !== "undefined" && notificationData.icon !== null){
+                                    var icon = notificationData.icon.toString();
+                                    if(icon.length > 0){
+                                        options["icon"] = icon;
+                                    }
+                                }
+                                if(typeof notificationData.badge !== "undefined" && notificationData.badge !== null){
+                                    var badge = notificationData.badge.toString();
+                                    if(badge.length > 0){
+                                        options["badge"] = badge;
+                                    }
+                                }
+                                if(typeof notificationData.tag !== "undefined" && notificationData.tag !== null){
+                                    var tag = notificationData.tag.toString();
+                                    if(tag.length > 0){
+                                        options["tag"] = tag;
+                                    }
+                                }
+                                if(typeof notificationData.requireInteraction !== "undefined"){
+                                    if(notificationData.requireInteraction === true){
+                                        options["requireInteraction"] = true;
+                                    }
+                                }
+                                options["data"] = notificationData;
+                                var promise = self.registration.showNotification(notificationData.title, options);
+                            }
+                            promises.push(promise);
+                            return Promise.all(promises);
+                        });
+                    }
+                })
+            })
+        );
+});
+
+self.addEventListener("notificationclick", function (event) {
+    event.notification.close();
+    var notificationData = event.notification.data;
+    if (typeof notificationData.clickUrl !== "undefined" && notificationData.clickUrl !== null) {
+        var clickUrl = notificationData.clickUrl.toString();
+        if(clickUrl.length > 0){
+            if (clients.openWindow) {
+                return clients.openWindow(clickUrl);
+            }
+        }
+    }
+});');
+                    $response->headers->set($response->headers->make('Content-Type', 'text/javascript'));
+                    return $response;
+                });
+    }
 
     /**
      * Constructs a new push notification and returns it.
@@ -186,7 +283,6 @@ class PushNotifications
     private function sendNotification(array $subscription, PushNotification $notification)
     {
         $app = App::get();
-        $options = $app->addons->get('ivopetkov/push-notifications-bearframework-addon')->options;
 
         $endpoint = $subscription['endpoint'];
 
@@ -226,7 +322,7 @@ class PushNotifications
                     "TTL:86400"
                 ]);
             } elseif ($host === 'android.googleapis.com') {
-                if (!isset($options['googleCloudMessagingAPIKey'])) {
+                if (!isset($this->config['googleCloudMessagingAPIKey'])) {
                     throw new \Exception('invalidGCMAPIKey');
                 }
                 $gcmUrl = 'https://android.googleapis.com/gcm/send/';
@@ -244,7 +340,7 @@ class PushNotifications
                     throw new \Exception('invalidEndpoint');
                 }
                 curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                    "Authorization:key=" . $options['googleCloudMessagingAPIKey'],
+                    "Authorization:key=" . $this->config['googleCloudMessagingAPIKey'],
                     "Content-Type:application/json"
                 ]);
             } else {
