@@ -321,19 +321,15 @@ self.addEventListener("notificationclick", function (event) {
                 curl_setopt($ch, CURLOPT_HTTPHEADER, [
                     "TTL:86400"
                 ]);
-            } elseif ($host === 'android.googleapis.com') {
+            } elseif ($host === 'android.googleapis.com' || $host === 'fcm.googleapis.com') {
                 if (!isset($this->config['googleCloudMessagingAPIKey'])) {
                     throw new \Exception('invalidGCMAPIKey');
                 }
-                $gcmUrl = 'https://android.googleapis.com/gcm/send/';
+                $gcmUrl = $host === 'android.googleapis.com' ? 'https://android.googleapis.com/gcm/send/' : 'https://fcm.googleapis.com/fcm/send/';
                 curl_setopt($ch, CURLOPT_URL, trim($gcmUrl, '/'));
                 if (strpos($endpoint, $gcmUrl) === 0) {
                     $messageData = [
                         "registration_ids" => [substr($endpoint, strlen($gcmUrl))],
-                            //"data" => $temp,
-                            //"notification" => $temp,
-                            //"time_to_live"=>10 // seconds
-                            //"priority"=>"high" // normal or high
                     ];
                     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($messageData));
                 } else {
@@ -357,7 +353,7 @@ self.addEventListener("notificationclick", function (event) {
             $statusCode = (int) $curlInfo['http_code'];
             if ($host === 'updates.push.services.mozilla.com' && $statusCode === 201) {
                 return true;
-            } elseif ($host === 'android.googleapis.com' && $statusCode === 200) {
+            } elseif (($host === 'android.googleapis.com' || $host === 'fcm.googleapis.com') && $statusCode === 200) {
                 $body = substr($response, $curlInfo['header_size']);
                 $resultData = json_decode($body, true);
                 if (isset($resultData['results'], $resultData['results'][0], $resultData['results'][0]['error']) && $resultData['results'][0]['error'] === 'NotRegistered') {
