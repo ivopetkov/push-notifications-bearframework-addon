@@ -5,6 +5,8 @@
  * Free to use under the MIT license.
  */
 
+/* global clientShortcuts */
+
 var ivoPetkov = ivoPetkov || {};
 ivoPetkov.bearFrameworkAddons = ivoPetkov.bearFrameworkAddons || {};
 ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
@@ -87,16 +89,18 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                     return JSON.stringify(data);
                                                 };
                                                 var onDone = function (subscription) {
-                                                    ivoPetkov.bearFrameworkAddons.serverRequests.send('ivopetkov-push-notifications-subscribe', {
-                                                        'subscription': getSubscriptionServerData(subscription),
-                                                        'subscriberKey': subscriberKey
-                                                    }, function (response) {
-                                                        response = JSON.parse(response);
-                                                        if (typeof response.status !== 'undefined' && response.status === 'ok') {
-                                                            respond('SUBSCRIBED', 'The subscription is OK!', {'subscriptionID': response.subscriptionID});
-                                                        } else {
-                                                            respond('UNKNOWN', 'Cannot subsribe on the server!');
-                                                        }
+                                                    clientShortcuts.get('serverRequests').then(function (serverRequests) {
+                                                        serverRequests.send('ivopetkov-push-notifications-subscribe', {
+                                                            'subscription': getSubscriptionServerData(subscription),
+                                                            'subscriberKey': subscriberKey
+                                                        }).then(function (responseText) {
+                                                            response = JSON.parse(responseText);
+                                                            if (typeof response.status !== 'undefined' && response.status === 'ok') {
+                                                                respond('SUBSCRIBED', 'The subscription is OK!', {'subscriptionID': response.subscriptionID});
+                                                            } else {
+                                                                respond('UNKNOWN', 'Cannot subsribe on the server!');
+                                                            }
+                                                        });
                                                     });
                                                 };
                                                 if (subscription) {
@@ -106,16 +110,18 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                         var subscriptionServerData = getSubscriptionServerData(subscription);
                                                         subscription.unsubscribe().then(function (successful) {
                                                             if (successful) {
-                                                                ivoPetkov.bearFrameworkAddons.serverRequests.send('ivopetkov-push-notifications-unsubscribe', {
-                                                                    'subscription': subscriptionServerData,
-                                                                    'subscriberKey': subscriberKey
-                                                                }, function (response) {
-                                                                    response = JSON.parse(response);
-                                                                    if (typeof response.status !== 'undefined' && response.status === 'ok') {
-                                                                        respond('UNSUBSCRIBED', 'Unsubscribe successful!');
-                                                                    } else {
-                                                                        respond('UNKNOWN', 'Cannot unsubsribe from the server!');
-                                                                    }
+                                                                clientShortcuts.get('serverRequests').then(function (serverRequests) {
+                                                                    clientShortcuts.send('ivopetkov-push-notifications-unsubscribe', {
+                                                                        'subscription': subscriptionServerData,
+                                                                        'subscriberKey': subscriberKey
+                                                                    }).then(function (responseText) {
+                                                                        response = JSON.parse(responseText);
+                                                                        if (typeof response.status !== 'undefined' && response.status === 'ok') {
+                                                                            respond('UNSUBSCRIBED', 'Unsubscribe successful!');
+                                                                        } else {
+                                                                            respond('UNKNOWN', 'Cannot unsubsribe from the server!');
+                                                                        }
+                                                                    });
                                                                 });
                                                             } else {
                                                                 respond('UNKNOWN', 'Unknown unsubscribe error!');
