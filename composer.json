@@ -18,7 +18,8 @@
         "ivopetkov/data-object": "0.7.*",
         "ivopetkov/encryption-bearframework-addon": "0.1.*",
         "ivopetkov/server-requests-bearframework-addon": "0.4.*",
-        "ivopetkov/locks-bearframework-addon": "0.1.*"
+        "ivopetkov/locks-bearframework-addon": "0.1.*",
+        "ivopetkov/client-shortcuts-bearframework-addon": "0.1.*"
     },
     "require-dev": {
         "bearframework/addon-tests": "0.3.*",
