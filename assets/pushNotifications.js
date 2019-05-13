@@ -5,7 +5,7 @@
  * Free to use under the MIT license.
  */
 
-/* global clientShortcuts */
+/* global clientShortcuts, clientPackages */
 
 var ivoPetkov = ivoPetkov || {};
 ivoPetkov.bearFrameworkAddons = ivoPetkov.bearFrameworkAddons || {};
@@ -89,7 +89,7 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                     return JSON.stringify(data);
                                                 };
                                                 var onDone = function (subscription) {
-                                                    clientShortcuts.get('serverRequests').then(function (serverRequests) {
+                                                    clientPackages.get('serverRequests').then(function (serverRequests) {
                                                         serverRequests.send('ivopetkov-push-notifications-subscribe', {
                                                             'subscription': getSubscriptionServerData(subscription),
                                                             'subscriberKey': subscriberKey
@@ -110,7 +110,7 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                         var subscriptionServerData = getSubscriptionServerData(subscription);
                                                         subscription.unsubscribe().then(function (successful) {
                                                             if (successful) {
-                                                                clientShortcuts.get('serverRequests').then(function (serverRequests) {
+                                                                clientPackages.get('serverRequests').then(function (serverRequests) {
                                                                     clientShortcuts.send('ivopetkov-push-notifications-unsubscribe', {
                                                                         'subscription': subscriptionServerData,
                                                                         'subscriberKey': subscriberKey

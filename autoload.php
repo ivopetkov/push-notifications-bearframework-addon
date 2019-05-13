@@ -12,6 +12,6 @@ BearFramework\Addons::register('ivopetkov/push-notifications-bearframework-addon
         'ivopetkov/encryption-bearframework-addon',
         'ivopetkov/server-requests-bearframework-addon',
         'ivopetkov/locks-bearframework-addon',
-        'ivopetkov/client-shortcuts-bearframework-addon'
+        'ivopetkov/client-packages-bearframework-addon'
     ]
 ]);
