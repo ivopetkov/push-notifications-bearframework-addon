@@ -5,7 +5,7 @@
  * Free to use under the MIT license.
  */
 
-/* global clientShortcuts, clientPackages */
+/* global clientPackages */
 
 var ivoPetkov = ivoPetkov || {};
 ivoPetkov.bearFrameworkAddons = ivoPetkov.bearFrameworkAddons || {};
@@ -111,7 +111,7 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                         subscription.unsubscribe().then(function (successful) {
                                                             if (successful) {
                                                                 clientPackages.get('serverRequests').then(function (serverRequests) {
-                                                                    clientShortcuts.send('ivopetkov-push-notifications-unsubscribe', {
+                                                                    serverRequests.send('ivopetkov-push-notifications-unsubscribe', {
                                                                         'subscription': subscriptionServerData,
                                                                         'subscriberKey': subscriberKey
                                                                     }).then(function (responseText) {
