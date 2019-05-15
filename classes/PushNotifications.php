@@ -233,7 +233,6 @@ self.addEventListener("notificationclick", function (event) {
         $initializeData[] = strlen($this->subscriberID) > 0 ? base64_encode($app->encryption->encrypt(json_encode(['ivopetkov-push-notifications-subscriber-id', $this->subscriberID]))) : '';
         $initializeData[] = $app->urls->get('/ivopetkov-push-notifications-service-worker.js');
         $scriptHTML = "<html>"
-                . '<head><link rel="client-package-prepare" name="serverRequests"></head>'
                 . "<body><script>var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 5]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);</script></body>"
                 . "</html>";
         $manifestHTML = '<html><head><link rel="client-packages"><link rel="manifest" href="' . $app->urls->get('/ivopetkov-push-notifications-manifest.json') . '"></head></html>';
