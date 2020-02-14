@@ -20,6 +20,7 @@ class PushNotifications
 {
 
     private $subscriberID = null;
+    private $verifyOwnershipBeforeShow = false;
     private $config = [];
 
     /**
@@ -42,7 +43,7 @@ class PushNotifications
                 $endpoint = $app->request->query->getValue('endpoint');
                 $result = [];
                 if (strlen($endpoint) > 0) {
-                    $result = $app->pushNotifications->getPendingEndpointData($endpoint);
+                    $result = $app->pushNotifications->getPendingEndpointData($this->subscriberID, $endpoint);
                 }
                 return new App\Response\JSON(json_encode($result));
             })
@@ -121,6 +122,13 @@ self.addEventListener("notificationclick", function (event) {
                 $response->headers->set($response->headers->make('Content-Type', 'text/javascript'));
                 return $response;
             });
+
+        if (isset($this->config['subscriberID'])) {
+            $this->subscriberID = $this->config['subscriberID'];
+        }
+        if (isset($this->config['verifyOwnershipBeforeShow'])) {
+            $this->verifyOwnershipBeforeShow = (int) $this->config['verifyOwnershipBeforeShow'] > 0;
+        }
     }
 
     /**
@@ -264,7 +272,7 @@ self.addEventListener("notificationclick", function (event) {
                     continue;
                 }
             }
-            $result = $this->sendNotification($subscription, $notification);
+            $result = $this->sendNotification($subscriberID, $subscription, $notification);
             if ($result === 'delete') {
                 $subscriptionsIDsToDelete[] = $subscriptionID;
             }
@@ -277,12 +285,13 @@ self.addEventListener("notificationclick", function (event) {
     /**
      * Sends a push notification to a specific subscription.
      * 
+     * @param string $subscriberID The subscriber ID.
      * @param array $subscription The subscription data.
      * @param array \IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification $notification The push notification to send.
      * @return mixed
      * @throws \Exception
      */
-    private function sendNotification(array $subscription, PushNotification $notification)
+    private function sendNotification(string $subscriberID, array $subscription, PushNotification $notification)
     {
         $app = App::get();
 
@@ -310,7 +319,14 @@ self.addEventListener("notificationclick", function (event) {
         $endpointDataKey = $this->getEndpointDataKey($endpoint);
         $data = $app->data->getValue($endpointDataKey);
         $data = strlen($data) > 0 ? json_decode($data, true) : [];
-        $data[] = $notificationData;
+        if (!isset($data[0])) { // notifications
+            $data[0] = [];
+        }
+        if (!isset($data[1])) { // subscriber
+            $data[0] = [];
+            $data[1] = $subscriberID;
+        }
+        $data[0][] = $notificationData;
         $app->data->set($app->data->make($endpointDataKey, json_encode($data)));
 
         $urlParts = parse_url($endpoint);
@@ -346,6 +362,7 @@ self.addEventListener("notificationclick", function (event) {
             }
             curl_setopt($ch, CURLOPT_HEADER, 1);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_POST, true);
 
             $response = curl_exec($ch);
@@ -353,8 +370,12 @@ self.addEventListener("notificationclick", function (event) {
             curl_close($ch);
             //$app->logger->log('push-notifications-response-error', print_r($subscription, true) . "\n" . $response);
             $statusCode = (int) $curlInfo['http_code'];
-            if ($host === 'updates.push.services.mozilla.com' && $statusCode === 201) {
-                return true;
+            if ($host === 'updates.push.services.mozilla.com') {
+                if ($statusCode === 201) {
+                    return true;
+                } elseif ($statusCode === 410) {
+                    return 'delete';
+                }
             } elseif (($host === 'android.googleapis.com' || $host === 'fcm.googleapis.com') && $statusCode === 200) {
                 $body = substr($response, $curlInfo['header_size']);
                 $resultData = json_decode($body, true);
@@ -363,6 +384,7 @@ self.addEventListener("notificationclick", function (event) {
                 }
                 return isset($resultData['success']) && (int) $resultData['success'] === 1;
             }
+            return false;
         } else {
             return 'delete';
         }
@@ -376,7 +398,7 @@ self.addEventListener("notificationclick", function (event) {
     private function getEndpointDataKey(string $endpoint): string
     {
         $endpointMD5 = md5($endpoint);
-        return '.temp/push-notifications/endpoints/' . substr($endpointMD5, 0, 2) . '/' . substr($endpointMD5, 2, 2) . '/' . $endpointMD5 . '.json';
+        return '.temp/push-notifications/endpoints/' . substr($endpointMD5, 0, 2) . '/' . substr($endpointMD5, 2, 2) . '/' . $endpointMD5 . '.2.json';
     }
 
     /**
@@ -425,17 +447,39 @@ self.addEventListener("notificationclick", function (event) {
     }
 
     /**
-     * 
+     * @internal
+     * @param string $subscriberID
      * @param string $endpoint
      * @return string
      */
-    public function getPendingEndpointData(string $endpoint): array
+    public function getPendingEndpointData(string $subscriberID, string $endpoint): array
     {
+        $result = [];
         $app = App::get();
         $endpointDataKey = $this->getEndpointDataKey($endpoint);
         $data = $app->data->getValue($endpointDataKey);
         $data = strlen($data) > 0 ? json_decode($data, true) : [];
+        if (isset($data[0])) { // notifications
+            if ($this->verifyOwnershipBeforeShow) {
+                if (isset($data[1])) {
+                    if ($data[1] === $subscriberID) {
+                        $result = $data[0];
+                    } else { // delete subscription
+                        $subscriberIDToUnsubscribeFrom = $data[1];
+                        $data = $this->getSubscriberData($subscriberIDToUnsubscribeFrom);
+                        foreach ($data['subscriptions'] as $subscriptionID => $subscription) {
+                            if ($subscription['endpoint'] === $endpoint) {
+                                $this->unsubscribe($subscriberIDToUnsubscribeFrom, $subscriptionID);
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else {
+                $result = $data[0];
+            }
+        }
         $app->data->delete($endpointDataKey);
-        return $data;
+        return $result;
     }
 }
