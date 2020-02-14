@@ -24,6 +24,8 @@ class PushNotification
     use \IvoPetkov\DataObjectTrait;
     use \IvoPetkov\DataObjectToArrayTrait;
     use \IvoPetkov\DataObjectToJSONTrait;
+    use \IvoPetkov\DataObjectFromArrayTrait;
+    use \IvoPetkov\DataObjectFromJSONTrait;
 
     function __construct()
     {
