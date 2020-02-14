@@ -30,31 +30,29 @@ class PushNotification
     function __construct()
     {
         $this
-                ->defineProperty('title', [
-                    'type' => '?string'
-                ])
-                ->defineProperty('body', [
-                    'type' => '?string'
-                ])
-                ->defineProperty('icon', [
-                    'type' => '?string'
-                ])
-                ->defineProperty('badge', [
-                    'type' => '?string'
-                ])
-                ->defineProperty('tag', [
-                    'type' => '?string'
-                ])
-                ->defineProperty('clickUrl', [
-                    'type' => '?string'
-                ])
-                ->defineProperty('requireInteraction', [
-                    'type' => 'bool',
-                    'init' => function() {
-                        return false;
-                    }
-                ])
-        ;
+            ->defineProperty('title', [
+                'type' => '?string'
+            ])
+            ->defineProperty('body', [
+                'type' => '?string'
+            ])
+            ->defineProperty('icon', [
+                'type' => '?string'
+            ])
+            ->defineProperty('badge', [
+                'type' => '?string'
+            ])
+            ->defineProperty('tag', [
+                'type' => '?string'
+            ])
+            ->defineProperty('clickUrl', [
+                'type' => '?string'
+            ])
+            ->defineProperty('requireInteraction', [
+                'type' => 'bool',
+                'init' => function () {
+                    return false;
+                }
+            ]);
     }
-
 }

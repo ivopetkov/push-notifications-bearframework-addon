@@ -38,22 +38,22 @@ class PushNotifications
 
         $app = App::get();
         $app->routes
-                ->add('/ivopetkov-push-notifications-data', function() use ($app) {
-                    $endpoint = $app->request->query->getValue('endpoint');
-                    $result = [];
-                    if (strlen($endpoint) > 0) {
-                        $result = $app->pushNotifications->getPendingEndpointData($endpoint);
-                    }
-                    return new App\Response\JSON(json_encode($result));
-                })
-                ->add('/ivopetkov-push-notifications-manifest.json', function() use ($app) {
-                    return new App\Response\JSON(json_encode([
-                                'gcm_sender_id' => (isset($this->config['googleCloudMessagingSenderID']) ? $this->config['googleCloudMessagingSenderID'] : ''),
-                                'gcm_user_visible_only' => true
-                    ]));
-                })
-                ->add('/ivopetkov-push-notifications-service-worker.js', function() use ($app) {
-                    $response = new App\Response('self.addEventListener("push", function (event) {
+            ->add('/ivopetkov-push-notifications-data', function () use ($app) {
+                $endpoint = $app->request->query->getValue('endpoint');
+                $result = [];
+                if (strlen($endpoint) > 0) {
+                    $result = $app->pushNotifications->getPendingEndpointData($endpoint);
+                }
+                return new App\Response\JSON(json_encode($result));
+            })
+            ->add('/ivopetkov-push-notifications-manifest.json', function () use ($app) {
+                return new App\Response\JSON(json_encode([
+                    'gcm_sender_id' => (isset($this->config['googleCloudMessagingSenderID']) ? $this->config['googleCloudMessagingSenderID'] : ''),
+                    'gcm_user_visible_only' => true
+                ]));
+            })
+            ->add('/ivopetkov-push-notifications-service-worker.js', function () use ($app) {
+                $response = new App\Response('self.addEventListener("push", function (event) {
     event.waitUntil(
         self.registration.pushManager.getSubscription().then(
             function (subscription) {
@@ -118,9 +118,9 @@ self.addEventListener("notificationclick", function (event) {
         }
     }
 });');
-                    $response->headers->set($response->headers->make('Content-Type', 'text/javascript'));
-                    return $response;
-                });
+                $response->headers->set($response->headers->make('Content-Type', 'text/javascript'));
+                return $response;
+            });
     }
 
     /**
@@ -135,7 +135,7 @@ self.addEventListener("notificationclick", function (event) {
         if (self::$newPushNotificationCache === null) {
             self::$newPushNotificationCache = new PushNotification();
         }
-        $pushNotification = clone(self::$newPushNotificationCache);
+        $pushNotification = clone (self::$newPushNotificationCache);
         if ($title !== null) {
             $pushNotification->title = $title;
         }
@@ -233,8 +233,8 @@ self.addEventListener("notificationclick", function (event) {
         $initializeData[] = strlen($this->subscriberID) > 0 ? base64_encode($app->encryption->encrypt(json_encode(['ivopetkov-push-notifications-subscriber-id', $this->subscriberID]))) : '';
         $initializeData[] = $app->urls->get('/ivopetkov-push-notifications-service-worker.js');
         $scriptHTML = "<html>"
-                . "<body><script>var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 5]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);</script></body>"
-                . "</html>";
+            . "<body><script>var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 5]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);</script></body>"
+            . "</html>";
         $manifestHTML = '<html><head><link rel="client-packages"><link rel="manifest" href="' . $app->urls->get('/ivopetkov-push-notifications-manifest.json') . '"></head></html>';
         $dom->insertHTMLMulti([
             ['source' => $scriptHTML],
@@ -438,5 +438,4 @@ self.addEventListener("notificationclick", function (event) {
         $app->data->delete($endpointDataKey);
         return $data;
     }
-
 }

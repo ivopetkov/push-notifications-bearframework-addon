@@ -13,16 +13,16 @@ $app = App::get();
 $context = $app->contexts->get(__FILE__);
 
 $context->classes
-        ->add('IvoPetkov\BearFrameworkAddons\PushNotifications', 'classes/PushNotifications.php')
-        ->add('IvoPetkov\BearFrameworkAddons\PushNotifications\*', 'classes/PushNotifications/*.php');
+    ->add('IvoPetkov\BearFrameworkAddons\PushNotifications', 'classes/PushNotifications.php')
+    ->add('IvoPetkov\BearFrameworkAddons\PushNotifications\*', 'classes/PushNotifications/*.php');
 
 $context->assets
-        ->addDir('assets/');
+    ->addDir('assets/');
 
 $app->shortcuts
-        ->add('pushNotifications', function() {
-            return new IvoPetkov\BearFrameworkAddons\PushNotifications();
-        });
+    ->add('pushNotifications', function () {
+        return new IvoPetkov\BearFrameworkAddons\PushNotifications();
+    });
 
 //$app->hooks->add('responseCreated', function($response) use ($app, $context) {
 //    if ((string) $app->request->path === '/' && $response instanceof App\Response\HTML) {
@@ -34,7 +34,7 @@ $app->shortcuts
 //    }
 //});
 
-$updateServerRequestSubscription = function($data, $subscribe) use ($app) {
+$updateServerRequestSubscription = function ($data, $subscribe) use ($app) {
     if (isset($data['subscription'], $data['subscriberKey'])) {
         $subscription = json_decode($data['subscription'], true);
         if (is_array($subscription)) {
@@ -62,9 +62,9 @@ $updateServerRequestSubscription = function($data, $subscribe) use ($app) {
 };
 
 $app->serverRequests
-        ->add('ivopetkov-push-notifications-subscribe', function($data) use ($updateServerRequestSubscription) {
-            return $updateServerRequestSubscription($data, true);
-        })
-        ->add('ivopetkov-push-notifications-unsubscribe', function($data) use ($updateServerRequestSubscription) {
-            return $updateServerRequestSubscription($data, false);
-        });
+    ->add('ivopetkov-push-notifications-subscribe', function ($data) use ($updateServerRequestSubscription) {
+        return $updateServerRequestSubscription($data, true);
+    })
+    ->add('ivopetkov-push-notifications-unsubscribe', function ($data) use ($updateServerRequestSubscription) {
+        return $updateServerRequestSubscription($data, false);
+    });
