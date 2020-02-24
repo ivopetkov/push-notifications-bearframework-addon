@@ -1,7 +1,12 @@
 {
     "name": "ivopetkov/push-notifications-bearframework-addon",
     "description": "Push Notifications addon for Bear Framework",
-    "keywords": ["push", "push notifications", "addon", "Bear Framework"],
+    "keywords": [
+        "push",
+        "push notifications",
+        "addon",
+        "Bear Framework"
+    ],
     "homepage": "https://github.com/ivopetkov/push-notifications-bearframework-addon",
     "license": "MIT",
     "authors": [
@@ -15,7 +20,7 @@
         "php": ">=7.1.0",
         "bearframework/bearframework": "1.*",
         "ivopetkov/html5-dom-document-php": "2.*",
-        "ivopetkov/data-object": "0.7.*",
+        "ivopetkov/data-object": "0.7.*|0.8.*",
         "ivopetkov/encryption-bearframework-addon": "0.1.*",
         "ivopetkov/server-requests-bearframework-addon": "0.4.*",
         "ivopetkov/locks-bearframework-addon": "0.1.*",
@@ -26,6 +31,8 @@
         "phpunit/phpunit": "7.*"
     },
     "autoload": {
-        "files": ["autoload.php"]
+        "files": [
+            "autoload.php"
+        ]
     }
 }
