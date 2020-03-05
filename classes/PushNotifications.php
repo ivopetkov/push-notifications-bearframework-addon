@@ -234,7 +234,7 @@ self.addEventListener("notificationclick", function (event) {
     public function apply(\BearFramework\App\Response\HTML $response, string $onLoad = ''): void
     {
         $app = App::get();
-        $context = $app->contexts->get(__FILE__);
+        $context = $app->contexts->get(__DIR__);
         $dom = new HTML5DOMDocument();
         $dom->loadHTML($response->content, HTML5DOMDocument::ALLOW_DUPLICATE_IDS);
         $initializeData = [];
