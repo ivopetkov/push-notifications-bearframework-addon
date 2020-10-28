@@ -351,14 +351,14 @@ self.addEventListener("notificationclick", function (event) {
                     ];
                     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($messageData));
                 } else {
-                    throw new \Exception('invalidEndpoint');
+                    throw new \Exception('Invalid endpoint (' . $endpoint . ')');
                 }
                 curl_setopt($ch, CURLOPT_HTTPHEADER, [
                     "Authorization:key=" . $this->config['googleCloudMessagingAPIKey'],
                     "Content-Type:application/json"
                 ]);
             } else {
-                throw new \Exception('invalidEndpoint');
+                throw new \Exception('Invalid endpoint (' . $endpoint . ')');
             }
             curl_setopt($ch, CURLOPT_HEADER, 1);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
