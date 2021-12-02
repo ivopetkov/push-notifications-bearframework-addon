@@ -7,6 +7,8 @@
  * Free to use under the MIT license.
  */
 
+use IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification;
+
 /**
  * @runTestsInSeparateProcesses
  */
@@ -16,9 +18,9 @@ class PushNotificationsTest extends BearFramework\AddonTests\PHPUnitTestCase
     /**
      * 
      */
-    public function test1()
+    public function testBasics()
     {
-        $this->assertTrue(true);
+        $app = $this->getApp();
+        $this->assertTrue($app->pushNotifications->make() instanceof PushNotification);
     }
-
 }
