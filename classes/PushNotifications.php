@@ -40,7 +40,7 @@ class PushNotifications
         $app = App::get();
         $app->routes
             ->add('/ivopetkov-push-notifications-data', function () use ($app) {
-                $endpoint = $app->request->query->getValue('endpoint');
+                $endpoint = (string)$app->request->query->getValue('endpoint');
                 $result = [];
                 if (strlen($endpoint) > 0) {
                     $result = $app->pushNotifications->getPendingEndpointData($this->subscriberID, $endpoint);
@@ -238,7 +238,7 @@ self.addEventListener("notificationclick", function (event) {
         $dom = new HTML5DOMDocument();
         $dom->loadHTML($response->content, HTML5DOMDocument::ALLOW_DUPLICATE_IDS);
         $initializeData = [];
-        $initializeData[] = strlen($this->subscriberID) > 0 ? base64_encode($app->encryption->encrypt(json_encode(['ivopetkov-push-notifications-subscriber-id', $this->subscriberID]))) : '';
+        $initializeData[] = strlen((string)$this->subscriberID) > 0 ? base64_encode($app->encryption->encrypt(json_encode(['ivopetkov-push-notifications-subscriber-id', $this->subscriberID]))) : '';
         $initializeData[] = $app->urls->get('/ivopetkov-push-notifications-service-worker.js');
         $scriptHTML = "<html>"
             . "<body><script>var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 5]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);</script></body>"
@@ -299,25 +299,25 @@ self.addEventListener("notificationclick", function (event) {
 
         $notificationData = [];
         $notificationData['title'] = (string) $notification->title;
-        if (strlen($notification->body) > 0) {
+        if (strlen((string)$notification->body) > 0) {
             $notificationData['body'] = (string) $notification->body;
         }
-        if (strlen($notification->icon) > 0) {
+        if (strlen((string)$notification->icon) > 0) {
             $notificationData['icon'] = (string) $notification->icon;
         }
-        if (strlen($notification->badge) > 0) {
+        if (strlen((string)$notification->badge) > 0) {
             $notificationData['badge'] = (string) $notification->badge;
         }
-        if (strlen($notification->tag) > 0) {
+        if (strlen((string)$notification->tag) > 0) {
             $notificationData['tag'] = (string) $notification->tag;
         }
-        if (strlen($notification->clickUrl) > 0) {
+        if (strlen((string)$notification->clickUrl) > 0) {
             $notificationData['clickUrl'] = (string) $notification->clickUrl;
         }
         $notificationData['requireInteraction'] = $notification->requireInteraction;
 
         $endpointDataKey = $this->getEndpointDataKey($endpoint);
-        $data = $app->data->getValue($endpointDataKey);
+        $data = (string)$app->data->getValue($endpointDataKey);
         $data = strlen($data) > 0 ? json_decode($data, true) : [];
         if (!isset($data[0])) { // notifications
             $data[0] = [];
@@ -421,7 +421,7 @@ self.addEventListener("notificationclick", function (event) {
     {
         $app = App::get();
         $subscriberDataKey = $this->getSubscriberDataKey($subscriberID);
-        $data = $app->data->getValue($subscriberDataKey);
+        $data = (string)$app->data->getValue($subscriberDataKey);
         $data = strlen($data) > 0 ? json_decode($data, true) : [];
         $data['id'] = $subscriberID;
         if (!isset($data['subscriptions'])) {
@@ -457,7 +457,7 @@ self.addEventListener("notificationclick", function (event) {
         $result = [];
         $app = App::get();
         $endpointDataKey = $this->getEndpointDataKey($endpoint);
-        $data = $app->data->getValue($endpointDataKey);
+        $data = (string)$app->data->getValue($endpointDataKey);
         $data = strlen($data) > 0 ? json_decode($data, true) : [];
         if (isset($data[0])) { // notifications
             if ($this->verifyOwnershipBeforeShow) {

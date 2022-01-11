@@ -39,7 +39,7 @@ $updateServerRequestSubscription = function ($data, $subscribe) use ($app) {
         $subscription = json_decode($data['subscription'], true);
         if (is_array($subscription)) {
             $subscriberKey = base64_decode($data['subscriberKey']);
-            $subscriberIDData = $app->encryption->decrypt((string) $subscriberKey);
+            $subscriberIDData = (string)$app->encryption->decrypt((string) $subscriberKey);
             if (strlen($subscriberIDData) > 0) {
                 $subscriberIDData = json_decode($subscriberIDData, true);
                 if (is_array($subscriberIDData) && isset($subscriberIDData[0], $subscriberIDData[1]) && $subscriberIDData[0] === 'ivopetkov-push-notifications-subscriber-id') {
