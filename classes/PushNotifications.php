@@ -158,9 +158,11 @@ self.addEventListener("notificationclick", function (event) {
      * 
      * @param string $subscriberID The subscriber ID. The subscriber ID.
      * @param array $subscription The subscription data. The subscription data.
+     * @param string|null $vapidPublicKey
+     * @param string|null $vapidPrivateKey
      * @return string Returns the subscription ID.
      */
-    public function subscribe(string $subscriberID, array $subscription): string
+    public function subscribe(string $subscriberID, array $subscription, string $vapidPublicKey = null, string $vapidPrivateKey = null): string
     {
         $app = App::get();
         $lockKey = 'notifications-subscriber-' . $subscriberID;
@@ -169,7 +171,8 @@ self.addEventListener("notificationclick", function (event) {
         ksort($subscription);
         $subscriptionID = md5(json_encode($subscription));
         if (!isset($data['subscriptions'][$subscriptionID])) {
-            $data['subscriptions'][$subscriptionID] = $subscription;
+            // $data['subscriptions'][$subscriptionID] = $subscription; // v1
+            $data['subscriptions'][$subscriptionID] = [2, $subscription, $vapidPublicKey, $vapidPrivateKey]; // v2
             $this->setSubscriberData($subscriberID, $data);
         }
         $app->locks->release($lockKey);
@@ -208,8 +211,20 @@ self.addEventListener("notificationclick", function (event) {
         ksort($subscription);
         $subscriptionJSON = json_encode($subscription);
         foreach ($data['subscriptions'] as $subscriptionID => $otherSubscription) {
-            if (json_encode($otherSubscription) === $subscriptionJSON) {
-                return $subscriptionID;
+            if (is_array($otherSubscription) && $otherSubscription[0] === 2) { // v2
+                if (json_encode($otherSubscription[1]) === $subscriptionJSON) {
+                    return $subscriptionID;
+                }
+            } else {
+                if (json_encode($otherSubscription) === $subscriptionJSON) {
+                    return $subscriptionID;
+                }
+                if (
+                    isset($otherSubscription['endpoint']) && isset($subscription['endpoint']) && $otherSubscription['endpoint'] === $subscription['endpoint'] &&
+                    isset($otherSubscription['key']) && isset($subscription['key']) && $otherSubscription['key'] === $subscription['key']
+                ) {
+                    return $subscriptionID;
+                }
             }
         }
         return null;
@@ -240,8 +255,11 @@ self.addEventListener("notificationclick", function (event) {
         $initializeData = [];
         $initializeData[] = strlen((string)$this->subscriberID) > 0 ? base64_encode($app->encryption->encrypt(json_encode(['ivopetkov-push-notifications-subscriber-id', $this->subscriberID]))) : '';
         $initializeData[] = $app->urls->get('/ivopetkov-push-notifications-service-worker.js');
+        // dev code        
+        //$jsCode = file_get_contents(__DIR__ . '/../assets/pushNotifications.js') . "ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad;
+        $jsCode = "var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 7]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);";
         $scriptHTML = "<html>"
-            . "<body><script>var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 5]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);</script></body>"
+            . "<body><script>" . $jsCode . "</script></body>"
             . "</html>";
         $manifestHTML = '<html><head><link rel="client-packages"><link rel="manifest" href="' . $app->urls->get('/ivopetkov-push-notifications-manifest.json') . '"></head></html>';
         $dom->insertHTMLMulti([
@@ -266,13 +284,22 @@ self.addEventListener("notificationclick", function (event) {
         $subscriptionIDs = isset($options['subscriptionIDs']) ? $options['subscriptionIDs'] : null;
         $data = $this->getSubscriberData($subscriberID);
         $subscriptionsIDsToDelete = [];
-        foreach ($data['subscriptions'] as $subscriptionID => $subscription) {
+        foreach ($data['subscriptions'] as $subscriptionID => $subscriptionData) {
             if ($subscriptionIDs !== null) {
                 if (array_search($subscriptionID, $subscriptionIDs) === false) {
                     continue;
                 }
             }
-            $result = $this->sendNotification($subscriberID, $subscription, $notification);
+            if (is_array($subscriptionData) && $subscriptionData[0] === 2) { // v2
+                $subscription = $subscriptionData[1];
+                $vapidPublicKey = $subscriptionData[2];
+                $vapidPrivateKey = $subscriptionData[3];
+            } else {
+                $subscription = $subscriptionData;
+                $vapidPublicKey = null;
+                $vapidPrivateKey = null;
+            }
+            $result = $this->sendNotification($subscriberID, $notification, $subscription, $vapidPublicKey, $vapidPrivateKey);
             if ($result === 'delete') {
                 $subscriptionsIDsToDelete[] = $subscriptionID;
             }
@@ -286,12 +313,14 @@ self.addEventListener("notificationclick", function (event) {
      * Sends a push notification to a specific subscription.
      * 
      * @param string $subscriberID The subscriber ID.
-     * @param array $subscription The subscription data.
      * @param array \IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification $notification The push notification to send.
+     * @param array $subscription The subscription data.
+     * @param array $vapidPublicKey The VAPID private key.
+     * @param array $vapidPrivateKey The VAPID private key.
      * @return mixed
      * @throws \Exception
      */
-    private function sendNotification(string $subscriberID, array $subscription, PushNotification $notification)
+    private function sendNotification(string $subscriberID, PushNotification $notification, array $subscription, string $vapidPublicKey = null, string $vapidPrivateKey = null)
     {
         $app = App::get();
 
@@ -329,64 +358,78 @@ self.addEventListener("notificationclick", function (event) {
         $data[0][] = $notificationData;
         $app->data->set($app->data->make($endpointDataKey, json_encode($data)));
 
-        $urlParts = parse_url($endpoint);
-        if (isset($urlParts['host'], $urlParts['path'])) {
-            $host = $urlParts['host'];
+        if ($vapidPublicKey !== null && $vapidPrivateKey !== null) {
+            $webPush = new \Minishlink\WebPush\WebPush([
+                'VAPID' => [
+                    'subject' => 'ntf',
+                    'publicKey' => $vapidPublicKey,
+                    'privateKey' => $vapidPrivateKey
+                ]
+            ]);
+            $result = $webPush->sendOneNotification(\Minishlink\WebPush\Subscription::create($subscription), null);
+            if ($result->isSubscriptionExpired()) {
+                return 'delete';
+            }
+        } else {
+            $urlParts = parse_url($endpoint);
+            if (isset($urlParts['host'], $urlParts['path'])) {
+                $host = $urlParts['host'];
 
-            $ch = curl_init();
-            if ($host === 'updates.push.services.mozilla.com') {
-                curl_setopt($ch, CURLOPT_URL, $endpoint);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                    "TTL:86400"
-                ]);
-            } elseif ($host === 'android.googleapis.com' || $host === 'fcm.googleapis.com') {
-                if (!isset($this->config['googleCloudMessagingAPIKey'])) {
-                    throw new \Exception('invalidGCMAPIKey');
-                }
-                $gcmUrl = $host === 'android.googleapis.com' ? 'https://android.googleapis.com/gcm/send/' : 'https://fcm.googleapis.com/fcm/send/';
-                curl_setopt($ch, CURLOPT_URL, trim($gcmUrl, '/'));
-                if (strpos($endpoint, $gcmUrl) === 0) {
-                    $messageData = [
-                        "registration_ids" => [substr($endpoint, strlen($gcmUrl))],
-                    ];
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($messageData));
+                $ch = curl_init();
+                if ($host === 'updates.push.services.mozilla.com') {
+                    curl_setopt($ch, CURLOPT_URL, $endpoint);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                        "TTL:86400"
+                    ]);
+                } elseif ($host === 'android.googleapis.com' || $host === 'fcm.googleapis.com') {
+                    if (!isset($this->config['googleCloudMessagingAPIKey'])) {
+                        throw new \Exception('invalidGCMAPIKey');
+                    }
+                    $gcmUrl = $host === 'android.googleapis.com' ? 'https://android.googleapis.com/gcm/send/' : 'https://fcm.googleapis.com/fcm/send/';
+                    curl_setopt($ch, CURLOPT_URL, trim($gcmUrl, '/'));
+                    if (strpos($endpoint, $gcmUrl) === 0) {
+                        $messageData = [
+                            "registration_ids" => [substr($endpoint, strlen($gcmUrl))],
+                        ];
+                        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($messageData));
+                    } else {
+                        throw new \Exception('Invalid endpoint (' . $endpoint . ')');
+                    }
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                        "Authorization:key=" . $this->config['googleCloudMessagingAPIKey'],
+                        "Content-Type:application/json"
+                    ]);
                 } else {
                     throw new \Exception('Invalid endpoint (' . $endpoint . ')');
                 }
-                curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                    "Authorization:key=" . $this->config['googleCloudMessagingAPIKey'],
-                    "Content-Type:application/json"
-                ]);
-            } else {
-                throw new \Exception('Invalid endpoint (' . $endpoint . ')');
-            }
-            curl_setopt($ch, CURLOPT_HEADER, 1);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_HEADER, 1);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_POST, true);
 
-            $response = curl_exec($ch);
-            $curlInfo = curl_getinfo($ch);
-            curl_close($ch);
-            //$app->logger->log('push-notifications-response-error', print_r($subscription, true) . "\n" . $response);
-            $statusCode = (int) $curlInfo['http_code'];
-            if ($host === 'updates.push.services.mozilla.com') {
-                if ($statusCode === 201) {
-                    return true;
-                } elseif ($statusCode === 410) {
-                    return 'delete';
+                $response = curl_exec($ch);
+                $curlInfo = curl_getinfo($ch);
+                curl_close($ch);
+                //$app->logger->log('push-notifications-response-error', print_r($subscription, true) . "\n" . $response);
+                $statusCode = (int) $curlInfo['http_code'];
+                if ($host === 'updates.push.services.mozilla.com') {
+                    if ($statusCode === 201) {
+                        return true;
+                    } elseif ($statusCode === 410) {
+                        return 'delete';
+                    }
+                } elseif (($host === 'android.googleapis.com' || $host === 'fcm.googleapis.com') && $statusCode === 200) {
+                    $body = substr($response, $curlInfo['header_size']);
+                    $resultData = json_decode($body, true);
+                    if (isset($resultData['results'], $resultData['results'][0], $resultData['results'][0]['error']) && $resultData['results'][0]['error'] === 'NotRegistered') {
+                        return 'delete';
+                    }
+                    return isset($resultData['success']) && (int) $resultData['success'] === 1;
                 }
-            } elseif (($host === 'android.googleapis.com' || $host === 'fcm.googleapis.com') && $statusCode === 200) {
-                $body = substr($response, $curlInfo['header_size']);
-                $resultData = json_decode($body, true);
-                if (isset($resultData['results'], $resultData['results'][0], $resultData['results'][0]['error']) && $resultData['results'][0]['error'] === 'NotRegistered') {
-                    return 'delete';
-                }
-                return isset($resultData['success']) && (int) $resultData['success'] === 1;
+                return false;
+            } else {
+                return 'delete';
             }
-            return false;
-        } else {
-            return 'delete';
         }
     }
 

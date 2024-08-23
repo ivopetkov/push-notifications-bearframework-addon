@@ -23,6 +23,20 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
         }
     };
 
+    var stringToArrayBuffer = function (string) {
+        var length = string.length;
+        var result = new Uint8Array(length);
+        for (var i = 0; i < length; i++) {
+            result[i] = string.charCodeAt(i);
+        }
+        return result.buffer;
+    };
+
+    var convertToBase64 = function (text) {
+        var padding = '='.repeat((4 - text.length % 4) % 4);
+        return (text + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    };
+
     var getSubscription = function (mode) {
         if (typeof Promise === 'undefined') {
             return {
@@ -76,59 +90,55 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                 serviceWorkerRegistration.pushManager.getSubscription()
                                     .then(function (subscription) {
                                         var getSubscriptionServerData = function (subscription) {
-                                            var endpoint = subscription.endpoint;
-                                            var rawKey = subscription.getKey ? subscription.getKey('p256dh') : '';
-                                            var key = rawKey ? btoa(String.fromCharCode.apply(null, new Uint8Array(rawKey))) : '';
-                                            var rawAuthSecret = subscription.getKey ? subscription.getKey('auth') : '';
-                                            var authSecret = rawAuthSecret ? btoa(String.fromCharCode.apply(null, new Uint8Array(rawAuthSecret))) : '';
-                                            var data = {
-                                                'endpoint': subscription.endpoint,
-                                                'key': key,
-                                                'authSecret': authSecret
-                                            };
-                                            return JSON.stringify(data);
+                                            return JSON.stringify(subscription);
                                         };
-                                        var onDone = function (subscription) {
-                                            clientPackages.get('serverRequests').then(function (serverRequests) {
-                                                serverRequests.send('ivopetkov-push-notifications-subscribe', {
-                                                    'subscription': getSubscriptionServerData(subscription),
-                                                    'subscriberKey': subscriberKey
-                                                }).then(function (responseText) {
-                                                    response = JSON.parse(responseText);
-                                                    if (typeof response.status !== 'undefined' && response.status === 'ok') {
-                                                        respond('SUBSCRIBED', 'The subscription is OK!', { 'subscriptionID': response.subscriptionID });
-                                                    } else {
-                                                        respond('UNKNOWN', 'Cannot subsribe on the server!');
-                                                    }
-                                                });
-                                            });
+                                        var respondWithError = function (error) {
+                                            if (typeof error === "undefined") {
+                                                error = null;
+                                            }
+                                            respond('UNKNOWN', error === null ? 'Error' : 'Error (details: ' + error + ')');
                                         };
                                         if (subscription) {
-                                            if (mode === 'getStatus' || mode === 'subscribe') {
-                                                onDone(subscription);
+                                            if (mode === 'getStatus') {
+                                                clientPackages.get('serverRequests').then(function (serverRequests) {
+                                                    serverRequests.send('ivopetkov-push-notifications-getid', {
+                                                        'subscription': getSubscriptionServerData(subscription),
+                                                        'subscriberKey': subscriberKey
+                                                    }).then(function (responseText) {
+                                                        var response = JSON.parse(responseText);
+                                                        if (typeof response.status !== 'undefined' && response.status === 'ok') {
+                                                            if (response.subscriptionID === null) {
+                                                                subscription.unsubscribe().then(function () {
+                                                                    respond('NOT_SUBSCRIBED', 'Not subscribed yet!');
+                                                                }).catch(function (error) { respondWithError(error); });
+                                                            } else {
+                                                                respond('SUBSCRIBED', 'The subscription is OK!', { 'subscriptionID': response.subscriptionID });
+                                                            }
+                                                        } else {
+                                                            respondWithError();
+                                                        }
+                                                    }).catch(function (error) { respondWithError(error); });
+                                                }).catch(function (error) { respondWithError(error); });
                                             } else if (mode === 'unsubscribe') {
-                                                var subscriptionServerData = getSubscriptionServerData(subscription);
                                                 subscription.unsubscribe().then(function (successful) {
                                                     if (successful) {
                                                         clientPackages.get('serverRequests').then(function (serverRequests) {
                                                             serverRequests.send('ivopetkov-push-notifications-unsubscribe', {
-                                                                'subscription': subscriptionServerData,
+                                                                'subscription': getSubscriptionServerData(subscription),
                                                                 'subscriberKey': subscriberKey
                                                             }).then(function (responseText) {
-                                                                response = JSON.parse(responseText);
+                                                                var response = JSON.parse(responseText);
                                                                 if (typeof response.status !== 'undefined' && response.status === 'ok') {
                                                                     respond('UNSUBSCRIBED', 'Unsubscribe successful!');
                                                                 } else {
-                                                                    respond('UNKNOWN', 'Cannot unsubsribe from the server!');
+                                                                    respondWithError();
                                                                 }
-                                                            });
-                                                        });
+                                                            }).catch(function (error) { respondWithError(error); });
+                                                        }).catch(function (error) { respondWithError(error); });
                                                     } else {
-                                                        respond('UNKNOWN', 'Unknown unsubscribe error!');
+                                                        respondWithError();
                                                     }
-                                                }).catch(function (e) {
-                                                    respond('UNKNOWN', 'Unknown unsubscribe error!');
-                                                })
+                                                }).catch(function (error) { respondWithError(error); });
                                             }
                                         } else {
                                             if (mode === 'getStatus') {
@@ -137,38 +147,46 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                 } else if (Notification.permission === 'default' || Notification.permission === 'granted') {
                                                     respond('NOT_SUBSCRIBED', 'Not subscribed yet!');
                                                 } else {
-                                                    respond('UNKNOWN', 'Unknown error (unknown status)!');
+                                                    respondWithError();
                                                 }
                                             } else if (mode === 'subscribe') {
-                                                serviceWorkerRegistration.pushManager.subscribe({ userVisibleOnly: true })
-                                                    .then(function (subscription) {
-                                                        onDone(subscription);
-                                                    })
-                                                    .catch(function (error) {
-                                                        if (Notification.permission === 'denied') {
-                                                            respond('DENIED', 'The user has blocked notifications!');
-                                                        } else if (Notification.permission === 'default') {
-                                                            respond('NOT_SUBSCRIBED', 'Not subscribed yet!');
-                                                        } else {
-                                                            respond('UNKNOWN', 'Unknown error (details: ' + error + ')!');
-                                                        }
-                                                    });
+                                                clientPackages.get('serverRequests').then(function (serverRequests) {
+                                                    serverRequests.send('ivopetkov-push-notifications-get-vapid', {}).then(function (responseText) {
+                                                        var response = JSON.parse(responseText);
+                                                        serviceWorkerRegistration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: stringToArrayBuffer(atob(convertToBase64(response.vapidPublicKey))) })
+                                                            .then(function (subscription) {
+                                                                serverRequests.send('ivopetkov-push-notifications-subscribe', {
+                                                                    'subscription': getSubscriptionServerData(subscription),
+                                                                    'vapidPublicKey': response.vapidPublicKey,
+                                                                    'vapidPrivateKey': response.vapidPrivateKey,
+                                                                    'subscriberKey': subscriberKey
+                                                                }).then(function (responseText) {
+                                                                    var response = JSON.parse(responseText);
+                                                                    if (typeof response.status !== 'undefined' && response.status === 'ok') {
+                                                                        respond('SUBSCRIBED', 'The subscription is OK!', { 'subscriptionID': response.subscriptionID });
+                                                                    } else {
+                                                                        respondWithError();
+                                                                    }
+                                                                }).catch(function (error) { respondWithError(error); });
+                                                            })
+                                                            .catch(function (error) {
+                                                                if (Notification.permission === 'denied') {
+                                                                    respond('DENIED', 'The user has blocked notifications!');
+                                                                } else if (Notification.permission === 'default') {
+                                                                    respond('NOT_SUBSCRIBED', 'Not subscribed yet!');
+                                                                } else {
+                                                                    respondWithError(error);
+                                                                }
+                                                            });
+                                                    }).catch(function (error) { respondWithError(error); });
+                                                }).catch(function (error) { respondWithError(error); });
                                             } else if (mode === 'unsubscribe') {
-                                                respond('UNKNOWN', 'Subscription not found!');
+                                                respondWithError();
                                             }
                                         }
-                                    })
-                                    .catch(function (error) {
-                                        respond('UNKNOWN', 'Unknown error (details: ' + JSON.stringify(error) + ')!');
-                                    });
-                            })
-                                .catch(function (error) {
-                                    respond('UNKNOWN', 'Unknown error (details: ' + JSON.stringify(error) + ')!');
-                                });
-                        })
-                        .catch(function (error) {
-                            respond('UNKNOWN', 'Unknown error (details: ' + JSON.stringify(error) + ')!');
-                        });
+                                    }).catch(function (error) { respondWithError(error); });
+                            }).catch(function (error) { respondWithError(error); });
+                        }).catch(function (error) { respondWithError(error); });
                 }, 100);
             } else {
                 respond('NOT_SUPPORTED', 'Service workers aren\'t supported in this browser!');
