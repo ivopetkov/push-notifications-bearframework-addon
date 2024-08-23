@@ -257,7 +257,7 @@ self.addEventListener("notificationclick", function (event) {
         $initializeData[] = $app->urls->get('/ivopetkov-push-notifications-service-worker.js');
         // dev code        
         //$jsCode = file_get_contents(__DIR__ . '/../assets/pushNotifications.js') . "ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad;
-        $jsCode = "var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 7]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);";
+        $jsCode = "var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 8]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);";
         $scriptHTML = "<html>"
             . "<body><script>" . $jsCode . "</script></body>"
             . "</html>";

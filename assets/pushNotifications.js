@@ -66,6 +66,12 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
             if (subscriberKey === null || subscriberKey.length === 0) {
                 respond('NO_SUBSCRIBER', 'No subscriber set on the server!');
             }
+            var respondWithError = function (error) {
+                if (typeof error === "undefined") {
+                    error = null;
+                }
+                respond('UNKNOWN', error === null ? 'Error' : 'Error (details: ' + error + ')');
+            };
             if ('serviceWorker' in navigator) {
                 var interval = window.setInterval(function () { // Wait for document to load. In Chrome the following code works inconsistently while the document is loading.
                     if (document.readyState !== 'complete') {
@@ -92,11 +98,37 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                         var getSubscriptionServerData = function (subscription) {
                                             return JSON.stringify(subscription);
                                         };
-                                        var respondWithError = function (error) {
-                                            if (typeof error === "undefined") {
-                                                error = null;
-                                            }
-                                            respond('UNKNOWN', error === null ? 'Error' : 'Error (details: ' + error + ')');
+                                        var continueSubscribe = function () {
+                                            clientPackages.get('serverRequests').then(function (serverRequests) {
+                                                serverRequests.send('ivopetkov-push-notifications-get-vapid', {}).then(function (responseText) {
+                                                    var response = JSON.parse(responseText);
+                                                    serviceWorkerRegistration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: stringToArrayBuffer(atob(convertToBase64(response.vapidPublicKey))) })
+                                                        .then(function (subscription) {
+                                                            serverRequests.send('ivopetkov-push-notifications-subscribe', {
+                                                                'subscription': getSubscriptionServerData(subscription),
+                                                                'vapidPublicKey': response.vapidPublicKey,
+                                                                'vapidPrivateKey': response.vapidPrivateKey,
+                                                                'subscriberKey': subscriberKey
+                                                            }).then(function (responseText) {
+                                                                var response = JSON.parse(responseText);
+                                                                if (typeof response.status !== 'undefined' && response.status === 'ok') {
+                                                                    respond('SUBSCRIBED', 'The subscription is OK!', { 'subscriptionID': response.subscriptionID });
+                                                                } else {
+                                                                    respondWithError();
+                                                                }
+                                                            }).catch(function (error) { respondWithError(error); });
+                                                        })
+                                                        .catch(function (error) {
+                                                            if (Notification.permission === 'denied') {
+                                                                respond('DENIED', 'The user has blocked notifications!');
+                                                            } else if (Notification.permission === 'default') {
+                                                                respond('NOT_SUBSCRIBED', 'Not subscribed yet!');
+                                                            } else {
+                                                                respondWithError(error);
+                                                            }
+                                                        });
+                                                }).catch(function (error) { respondWithError(error); });
+                                            }).catch(function (error) { respondWithError(error); });
                                         };
                                         if (subscription) {
                                             if (mode === 'getStatus') {
@@ -110,6 +142,26 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                             if (response.subscriptionID === null) {
                                                                 subscription.unsubscribe().then(function () {
                                                                     respond('NOT_SUBSCRIBED', 'Not subscribed yet!');
+                                                                }).catch(function (error) { respondWithError(error); });
+                                                            } else {
+                                                                respond('SUBSCRIBED', 'The subscription is OK!', { 'subscriptionID': response.subscriptionID });
+                                                            }
+                                                        } else {
+                                                            respondWithError();
+                                                        }
+                                                    }).catch(function (error) { respondWithError(error); });
+                                                }).catch(function (error) { respondWithError(error); });
+                                            } else if (mode === 'subscribe') {
+                                                clientPackages.get('serverRequests').then(function (serverRequests) {
+                                                    serverRequests.send('ivopetkov-push-notifications-getid', {
+                                                        'subscription': getSubscriptionServerData(subscription),
+                                                        'subscriberKey': subscriberKey
+                                                    }).then(function (responseText) {
+                                                        var response = JSON.parse(responseText);
+                                                        if (typeof response.status !== 'undefined' && response.status === 'ok') {
+                                                            if (response.subscriptionID === null) {
+                                                                subscription.unsubscribe().then(function () {
+                                                                    continueSubscribe();
                                                                 }).catch(function (error) { respondWithError(error); });
                                                             } else {
                                                                 respond('SUBSCRIBED', 'The subscription is OK!', { 'subscriptionID': response.subscriptionID });
@@ -150,36 +202,7 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                     respondWithError();
                                                 }
                                             } else if (mode === 'subscribe') {
-                                                clientPackages.get('serverRequests').then(function (serverRequests) {
-                                                    serverRequests.send('ivopetkov-push-notifications-get-vapid', {}).then(function (responseText) {
-                                                        var response = JSON.parse(responseText);
-                                                        serviceWorkerRegistration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: stringToArrayBuffer(atob(convertToBase64(response.vapidPublicKey))) })
-                                                            .then(function (subscription) {
-                                                                serverRequests.send('ivopetkov-push-notifications-subscribe', {
-                                                                    'subscription': getSubscriptionServerData(subscription),
-                                                                    'vapidPublicKey': response.vapidPublicKey,
-                                                                    'vapidPrivateKey': response.vapidPrivateKey,
-                                                                    'subscriberKey': subscriberKey
-                                                                }).then(function (responseText) {
-                                                                    var response = JSON.parse(responseText);
-                                                                    if (typeof response.status !== 'undefined' && response.status === 'ok') {
-                                                                        respond('SUBSCRIBED', 'The subscription is OK!', { 'subscriptionID': response.subscriptionID });
-                                                                    } else {
-                                                                        respondWithError();
-                                                                    }
-                                                                }).catch(function (error) { respondWithError(error); });
-                                                            })
-                                                            .catch(function (error) {
-                                                                if (Notification.permission === 'denied') {
-                                                                    respond('DENIED', 'The user has blocked notifications!');
-                                                                } else if (Notification.permission === 'default') {
-                                                                    respond('NOT_SUBSCRIBED', 'Not subscribed yet!');
-                                                                } else {
-                                                                    respondWithError(error);
-                                                                }
-                                                            });
-                                                    }).catch(function (error) { respondWithError(error); });
-                                                }).catch(function (error) { respondWithError(error); });
+                                                continueSubscribe();
                                             } else if (mode === 'unsubscribe') {
                                                 respondWithError();
                                             }
