@@ -211,7 +211,7 @@ self.addEventListener("notificationclick", function (event) {
         ksort($subscription);
         $subscriptionJSON = json_encode($subscription);
         foreach ($data['subscriptions'] as $subscriptionID => $otherSubscription) {
-            if (is_array($otherSubscription) && $otherSubscription[0] === 2) { // v2
+            if (is_array($otherSubscription) && isset($otherSubscription[0]) && $otherSubscription[0] === 2) { // v2
                 if (json_encode($otherSubscription[1]) === $subscriptionJSON) {
                     return $subscriptionID;
                 }
@@ -290,7 +290,7 @@ self.addEventListener("notificationclick", function (event) {
                     continue;
                 }
             }
-            if (is_array($subscriptionData) && $subscriptionData[0] === 2) { // v2
+            if (is_array($subscriptionData) && isset($subscriptionData[0]) && $subscriptionData[0] === 2) { // v2
                 $subscription = $subscriptionData[1];
                 $vapidPublicKey = $subscriptionData[2];
                 $vapidPrivateKey = $subscriptionData[3];
