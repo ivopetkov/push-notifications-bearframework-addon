@@ -511,7 +511,7 @@ self.addEventListener("notificationclick", function (event) {
                         $subscriberIDToUnsubscribeFrom = $data[1];
                         $data = $this->getSubscriberData($subscriberIDToUnsubscribeFrom);
                         foreach ($data['subscriptions'] as $subscriptionID => $subscription) {
-                            if ($subscription['endpoint'] === $endpoint) {
+                            if (isset($subscription['endpoint']) && $subscription['endpoint'] === $endpoint) {
                                 $this->unsubscribe($subscriberIDToUnsubscribeFrom, $subscriptionID);
                                 break;
                             }
