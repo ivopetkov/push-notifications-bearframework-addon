@@ -138,7 +138,7 @@ self.addEventListener("notificationclick", function (event) {
      * @param ?string $body The notification body.
      * @return \BearFramework\PushNotifications\PushNotification
      */
-    public function make(string $title = null, string $body = null): PushNotification
+    public function make(?string $title = null, ?string $body = null): PushNotification
     {
         if (self::$newPushNotificationCache === null) {
             self::$newPushNotificationCache = new PushNotification();
@@ -162,7 +162,7 @@ self.addEventListener("notificationclick", function (event) {
      * @param string|null $vapidPrivateKey
      * @return string Returns the subscription ID.
      */
-    public function subscribe(string $subscriberID, array $subscription, string $vapidPublicKey = null, string $vapidPrivateKey = null): string
+    public function subscribe(string $subscriberID, array $subscription, ?string $vapidPublicKey = null, ?string $vapidPrivateKey = null): string
     {
         $app = App::get();
         $lockKey = 'notifications-subscriber-' . $subscriberID;
@@ -320,7 +320,7 @@ self.addEventListener("notificationclick", function (event) {
      * @return mixed
      * @throws \Exception
      */
-    private function sendNotification(string $subscriberID, PushNotification $notification, array $subscription, string $vapidPublicKey = null, string $vapidPrivateKey = null)
+    private function sendNotification(string $subscriberID, PushNotification $notification, array $subscription, ?string $vapidPublicKey = null, ?string $vapidPrivateKey = null)
     {
         $app = App::get();
 
