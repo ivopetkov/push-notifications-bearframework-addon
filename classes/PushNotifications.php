@@ -47,11 +47,13 @@ class PushNotifications
                 }
                 return new App\Response\JSON(json_encode($result));
             })
-            ->add('/ivopetkov-push-notifications-manifest.json', function () use ($app) {
-                return new App\Response\JSON(json_encode([
-                    'gcm_sender_id' => (isset($this->config['googleCloudMessagingSenderID']) ? $this->config['googleCloudMessagingSenderID'] : ''),
-                    'gcm_user_visible_only' => true
-                ]));
+            ->add('/ivopetkov-push-notifications-manifest.json', function () {
+                if (isset($this->config['googleCloudMessagingSenderID'])) {
+                    return new App\Response\JSON(json_encode([
+                        'gcm_sender_id' => $this->config['googleCloudMessagingSenderID'],
+                        'gcm_user_visible_only' => true
+                    ]));
+                }
             })
             ->add('/ivopetkov-push-notifications-service-worker.js', function () use ($app) {
                 $response = new App\Response('self.addEventListener("push", function (event) {
@@ -258,10 +260,15 @@ self.addEventListener("notificationclick", function (event) {
         // dev code        
         //$jsCode = file_get_contents(__DIR__ . '/../assets/pushNotifications.js') . "ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad;
         $jsCode = "var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 8]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);";
-        $scriptHTML = "<html>"
-            . "<body><script>" . $jsCode . "</script></body>"
-            . "</html>";
-        $manifestHTML = '<html><head><link rel="client-packages"><link rel="manifest" href="' . $app->urls->get('/ivopetkov-push-notifications-manifest.json') . '"></head></html>';
+        $scriptHTML = '<html>'
+            . '<head><link rel="client-packages"></head>'
+            . '<body><script>' . $jsCode . '</script></body>'
+            . '</html>';
+        if (isset($this->config['googleCloudMessagingSenderID'])) {
+            $manifestHTML = '<html><head><link rel="manifest" href="' . $app->urls->get('/ivopetkov-push-notifications-manifest.json') . '"></head></html>';
+        } else {
+            $manifestHTML = '';
+        }
         $dom->insertHTMLMulti([
             ['source' => $scriptHTML],
             ['source' => $manifestHTML]
