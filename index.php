@@ -34,7 +34,7 @@ $app->shortcuts
 //    }
 //});
 
-$processServerRequestSubscription = function (array $data, int $action) use ($app) { // Actions: 1 - getid, 2 - subscribe, 3 - unsubscribe
+$processServerRequestSubscription = function (array $data, int $action) use ($app) { // Actions: 1 - get, 2 - subscribe, 3 - unsubscribe
     if (isset($data['subscription'], $data['subscriberKey'])) {
         $subscription = json_decode($data['subscription'], true);
         if (is_array($subscription)) {
@@ -44,18 +44,40 @@ $processServerRequestSubscription = function (array $data, int $action) use ($ap
                 $subscriberIDData = json_decode($subscriberIDData, true);
                 if (is_array($subscriberIDData) && isset($subscriberIDData[0], $subscriberIDData[1]) && $subscriberIDData[0] === 'ivopetkov-push-notifications-subscriber-id') {
                     $subscriberID = (string) $subscriberIDData[1];
-                    if ($action === 1) { // getid
-                        $subscriptionID = $app->pushNotifications->getSubscriptionID($subscriberID, $subscription);
-                        return json_encode(['status' => 'ok', 'subscriptionID' => $subscriptionID]);
+                    if ($action === 1) { // get
+                        $subscriptionData = $app->pushNotifications->getSubscriptionData($subscriberID, $subscription);
+                        return json_encode([
+                            'status' => 'ok',
+                            'subscriptionID' => $subscriptionData !== null ? $subscriptionData['id'] : null,
+                            'channels' => $subscriptionData !== null ? $subscriptionData['channels'] : [],
+                        ]);
                     } else if ($action === 2) { // subscribe
-                        $subscriptionID = $app->pushNotifications->subscribe($subscriberID, $subscription, isset($data['vapidPublicKey']) ? $data['vapidPublicKey'] : null, isset($data['vapidPrivateKey']) ? $data['vapidPrivateKey'] : null);
-                        return json_encode(['status' => 'ok', 'subscriptionID' => $subscriptionID]);
-                    } else {
+                        $subscriptionID = $app->pushNotifications->subscribe($subscriberID, $subscription, isset($data['vapidPublicKey']) ? $data['vapidPublicKey'] : null, isset($data['vapidPrivateKey']) ? $data['vapidPrivateKey'] : null, isset($data['channel']) ? $data['channel'] : null);
+                        $subscriptionData = $app->pushNotifications->getSubscriptionData($subscriberID, $subscription);
+                        return json_encode([
+                            'status' => 'ok',
+                            'subscriptionID' => $subscriptionID,
+                            'channels' => $subscriptionData !== null ? $subscriptionData['channels'] : [],
+                        ]);
+                    } else { // unsubscribe
+                        $channel = isset($data['channel']) ? $data['channel'] : null;
                         $subscriptionID = $app->pushNotifications->getSubscriptionID($subscriberID, $subscription);
                         if ($subscriptionID !== null) {
-                            $app->pushNotifications->unsubscribe($subscriberID, $subscriptionID);
+                            $app->pushNotifications->unsubscribe($subscriberID, $subscriptionID, $channel);
                         }
-                        return json_encode(['status' => 'ok']);
+                        if ($channel !== null) {
+                            $subscriptionData = $app->pushNotifications->getSubscriptionData($subscriberID, $subscription);
+                            if (!empty($subscriptionData['channels'])) {
+                                return json_encode([
+                                    'status' => 'keep',
+                                    'subscriptionID' => $subscriptionID,
+                                    'channels' => $subscriptionData['channels'],
+                                ]);
+                            }
+                        }
+                        return json_encode([
+                            'status' => 'ok'
+                        ]);
                     }
                 }
             }
@@ -65,7 +87,7 @@ $processServerRequestSubscription = function (array $data, int $action) use ($ap
 };
 
 $app->serverRequests
-    ->add('ivopetkov-push-notifications-getid', function ($data) use ($processServerRequestSubscription) {
+    ->add('ivopetkov-push-notifications-get', function ($data) use ($processServerRequestSubscription) {
         return $processServerRequestSubscription($data, 1);
     })
     ->add('ivopetkov-push-notifications-subscribe', function ($data) use ($processServerRequestSubscription) {

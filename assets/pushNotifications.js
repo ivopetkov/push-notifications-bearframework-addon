@@ -37,7 +37,7 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
         return (text + padding).replace(/\-/g, '+').replace(/_/g, '/');
     };
 
-    var getSubscription = function (mode) {
+    var processRequest = function (mode, options) {
         if (typeof Promise === 'undefined') {
             return {
                 'then': function (resolve) {
@@ -95,7 +95,7 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                             navigator.serviceWorker.ready.then(function (serviceWorkerRegistration) {
                                 serviceWorkerRegistration.pushManager.getSubscription()
                                     .then(function (subscription) {
-                                        var getSubscriptionServerData = function (subscription) {
+                                        var processRequestServerData = function (subscription) {
                                             return JSON.stringify(subscription);
                                         };
                                         var continueSubscribe = function () {
@@ -105,14 +105,18 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                     serviceWorkerRegistration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: stringToArrayBuffer(atob(convertToBase64(response.vapidPublicKey))) })
                                                         .then(function (subscription) {
                                                             serverRequests.send('ivopetkov-push-notifications-subscribe', {
-                                                                'subscription': getSubscriptionServerData(subscription),
+                                                                'subscription': processRequestServerData(subscription),
+                                                                'channel': typeof options.channel !== 'undefined' ? options.channel : null,
                                                                 'vapidPublicKey': response.vapidPublicKey,
                                                                 'vapidPrivateKey': response.vapidPrivateKey,
                                                                 'subscriberKey': subscriberKey
                                                             }).then(function (responseText) {
                                                                 var response = JSON.parse(responseText);
                                                                 if (typeof response.status !== 'undefined' && response.status === 'ok') {
-                                                                    respond('SUBSCRIBED', 'The subscription is OK!', { 'subscriptionID': response.subscriptionID });
+                                                                    respond('SUBSCRIBED', 'The subscription is OK!', {
+                                                                        'subscriptionID': response.subscriptionID,
+                                                                        'channels': response.channels,
+                                                                    });
                                                                 } else {
                                                                     respondWithError();
                                                                 }
@@ -133,8 +137,8 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                         if (subscription) {
                                             if (mode === 'getStatus') {
                                                 clientPackages.get('serverRequests').then(function (serverRequests) {
-                                                    serverRequests.send('ivopetkov-push-notifications-getid', {
-                                                        'subscription': getSubscriptionServerData(subscription),
+                                                    serverRequests.send('ivopetkov-push-notifications-get', {
+                                                        'subscription': processRequestServerData(subscription),
                                                         'subscriberKey': subscriberKey
                                                     }).then(function (responseText) {
                                                         var response = JSON.parse(responseText);
@@ -144,7 +148,10 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                                     respond('NOT_SUBSCRIBED', 'Not subscribed yet!');
                                                                 }).catch(function (error) { respondWithError(error); });
                                                             } else {
-                                                                respond('SUBSCRIBED', 'The subscription is OK!', { 'subscriptionID': response.subscriptionID });
+                                                                respond('SUBSCRIBED', 'The subscription is OK!', {
+                                                                    'subscriptionID': response.subscriptionID,
+                                                                    'channels': response.channels,
+                                                                });
                                                             }
                                                         } else {
                                                             respondWithError();
@@ -153,18 +160,42 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                 }).catch(function (error) { respondWithError(error); });
                                             } else if (mode === 'subscribe') {
                                                 clientPackages.get('serverRequests').then(function (serverRequests) {
-                                                    serverRequests.send('ivopetkov-push-notifications-getid', {
-                                                        'subscription': getSubscriptionServerData(subscription),
+                                                    serverRequests.send('ivopetkov-push-notifications-get', {
+                                                        'subscription': processRequestServerData(subscription),
                                                         'subscriberKey': subscriberKey
                                                     }).then(function (responseText) {
                                                         var response = JSON.parse(responseText);
                                                         if (typeof response.status !== 'undefined' && response.status === 'ok') {
+                                                            var channel = typeof options.channel !== 'undefined' ? options.channel : null;
                                                             if (response.subscriptionID === null) {
                                                                 subscription.unsubscribe().then(function () {
                                                                     continueSubscribe();
                                                                 }).catch(function (error) { respondWithError(error); });
                                                             } else {
-                                                                respond('SUBSCRIBED', 'The subscription is OK!', { 'subscriptionID': response.subscriptionID });
+                                                                if (channel !== null && response.channels.indexOf(channel) === -1) {
+                                                                    clientPackages.get('serverRequests').then(function (serverRequests) {
+                                                                        serverRequests.send('ivopetkov-push-notifications-subscribe', {
+                                                                            'subscription': processRequestServerData(subscription),
+                                                                            'channel': typeof options.channel !== 'undefined' ? options.channel : null,
+                                                                            'subscriberKey': subscriberKey
+                                                                        }).then(function (responseText) {
+                                                                            var response = JSON.parse(responseText);
+                                                                            if (typeof response.status !== 'undefined' && response.status === 'ok') {
+                                                                                respond('SUBSCRIBED', 'The subscription is OK!', {
+                                                                                    'subscriptionID': response.subscriptionID,
+                                                                                    'channels': response.channels,
+                                                                                });
+                                                                            } else {
+                                                                                respondWithError();
+                                                                            }
+                                                                        }).catch(function (error) { respondWithError(error); });
+                                                                    }).catch(function (error) { respondWithError(error); });
+                                                                } else {
+                                                                    respond('SUBSCRIBED', 'The subscription is OK!', {
+                                                                        'subscriptionID': response.subscriptionID,
+                                                                        'channels': response.channels,
+                                                                    });
+                                                                }
                                                             }
                                                         } else {
                                                             respondWithError();
@@ -172,24 +203,34 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
                                                     }).catch(function (error) { respondWithError(error); });
                                                 }).catch(function (error) { respondWithError(error); });
                                             } else if (mode === 'unsubscribe') {
-                                                subscription.unsubscribe().then(function (successful) {
-                                                    if (successful) {
-                                                        clientPackages.get('serverRequests').then(function (serverRequests) {
-                                                            serverRequests.send('ivopetkov-push-notifications-unsubscribe', {
-                                                                'subscription': getSubscriptionServerData(subscription),
-                                                                'subscriberKey': subscriberKey
-                                                            }).then(function (responseText) {
-                                                                var response = JSON.parse(responseText);
-                                                                if (typeof response.status !== 'undefined' && response.status === 'ok') {
-                                                                    respond('UNSUBSCRIBED', 'Unsubscribe successful!');
-                                                                } else {
-                                                                    respondWithError();
-                                                                }
-                                                            }).catch(function (error) { respondWithError(error); });
-                                                        }).catch(function (error) { respondWithError(error); });
-                                                    } else {
-                                                        respondWithError();
-                                                    }
+                                                clientPackages.get('serverRequests').then(function (serverRequests) {
+                                                    serverRequests.send('ivopetkov-push-notifications-unsubscribe', {
+                                                        'subscription': processRequestServerData(subscription),
+                                                        'channel': (typeof options.channel !== 'undefined' ? options.channel : null),
+                                                        'subscriberKey': subscriberKey
+                                                    }).then(function (responseText) {
+                                                        var response = JSON.parse(responseText);
+                                                        if (typeof response.status !== 'undefined') {
+                                                            if (response.status === 'ok') {
+                                                                subscription.unsubscribe().then(function (successful) {
+                                                                    if (successful) {
+                                                                        respond('UNSUBSCRIBED', 'Unsubscribe successful!');
+                                                                    } else {
+                                                                        respondWithError();
+                                                                    }
+                                                                }).catch(function (error) { respondWithError(error); });
+                                                            } else if (response.status === 'keep') {
+                                                                respond('SUBSCRIBED', 'The subscription is OK!', {
+                                                                    'subscriptionID': response.subscriptionID,
+                                                                    'channels': response.channels,
+                                                                });
+                                                            } else {
+                                                                respondWithError();
+                                                            }
+                                                        } else {
+                                                            respondWithError();
+                                                        }
+                                                    }).catch(function (error) { respondWithError(error); });
                                                 }).catch(function (error) { respondWithError(error); });
                                             }
                                         } else {
@@ -218,15 +259,21 @@ ivoPetkov.bearFrameworkAddons.pushNotifications = (function () {
     };
 
     var getStatus = function () {
-        return getSubscription('getStatus');
+        return processRequest('getStatus', {});
     };
 
-    var subscribe = function () {
-        return getSubscription('subscribe');
+    var subscribe = function (channel) {
+        if (typeof channel === 'undefined') {
+            channel = null;
+        }
+        return processRequest('subscribe', { channel: channel });
     };
 
-    var unsubscribe = function () {
-        return getSubscription('unsubscribe');
+    var unsubscribe = function (channel) {
+        if (typeof channel === 'undefined') {
+            channel = null;
+        }
+        return processRequest('unsubscribe', { channel: channel });
     };
 
     return {

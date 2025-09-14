@@ -162,9 +162,10 @@ self.addEventListener("notificationclick", function (event) {
      * @param array $subscription The subscription data. The subscription data.
      * @param string|null $vapidPublicKey
      * @param string|null $vapidPrivateKey
+     * @param string|null $channel
      * @return string Returns the subscription ID.
      */
-    public function subscribe(string $subscriberID, array $subscription, ?string $vapidPublicKey = null, ?string $vapidPrivateKey = null): string
+    public function subscribe(string $subscriberID, array $subscription, ?string $vapidPublicKey = null, ?string $vapidPrivateKey = null, ?string $channel = null): string
     {
         $app = App::get();
         $lockKey = 'notifications-subscriber-' . $subscriberID;
@@ -172,9 +173,27 @@ self.addEventListener("notificationclick", function (event) {
         $data = $this->getSubscriberData($subscriberID);
         ksort($subscription);
         $subscriptionID = md5(json_encode($subscription));
+        $newSubscriptionData = null;
         if (!isset($data['subscriptions'][$subscriptionID])) {
             // $data['subscriptions'][$subscriptionID] = $subscription; // v1
-            $data['subscriptions'][$subscriptionID] = [2, $subscription, $vapidPublicKey, $vapidPrivateKey]; // v2
+            $channels = [];
+            if ($channel !== null) {
+                $channels[] = $channel;
+            }
+            $newSubscriptionData = [2, $subscription, $vapidPublicKey, $vapidPrivateKey, $channels]; // v2
+        } elseif ($channel !== null) {
+            if (isset($data['subscriptions'][$subscriptionID][4])) {
+                if (array_search($channel, $data['subscriptions'][$subscriptionID][4]) === false) {
+                    $data['subscriptions'][$subscriptionID][4][] = $channel;
+                    $newSubscriptionData = $data['subscriptions'][$subscriptionID];
+                }
+            } else {
+                $data['subscriptions'][$subscriptionID][4] = [$channel];
+                $newSubscriptionData = $data['subscriptions'][$subscriptionID];
+            }
+        }
+        if ($newSubscriptionData !== null) {
+            $data['subscriptions'][$subscriptionID] = $newSubscriptionData;
             $this->setSubscriberData($subscriberID, $data);
         }
         $app->locks->release($lockKey);
@@ -186,17 +205,39 @@ self.addEventListener("notificationclick", function (event) {
      * 
      * @param string $subscriberID The subscriber ID.
      * @param string $subscriptionID The subscription ID to delete.
+     * @param string|null $channel
      */
-    public function unsubscribe(string $subscriberID, string $subscriptionID): void
+    public function unsubscribe(string $subscriberID, string $subscriptionID, ?string $channel = null): void
     {
         $app = App::get();
         $lockKey = 'notifications-subscriber-' . $subscriberID;
         $app->locks->acquire($lockKey);
         $data = $this->getSubscriberData($subscriberID);
         if (isset($data['subscriptions'][$subscriptionID])) {
-            unset($data['subscriptions'][$subscriptionID]);
+            if ($channel !== null) {
+                if (isset($data['subscriptions'][$subscriptionID][4])) {
+                    $channels = $data['subscriptions'][$subscriptionID][4];
+                    if (array_search($channel, $channels) !== false) {
+                        $key = array_search($channel, $channels);
+                        if ($key !== false) {
+                            unset($channels[$key]);
+                            $channels = array_values($channels);
+                        }
+                    }
+                    if (empty($channels)) {
+                        unset($data['subscriptions'][$subscriptionID]);
+                    } else {
+                        $data['subscriptions'][$subscriptionID][4] = $channels;
+                    }
+                } else {
+                    unset($data['subscriptions'][$subscriptionID]);
+                }
+            } else {
+                unset($data['subscriptions'][$subscriptionID]);
+            }
             $this->setSubscriberData($subscriberID, $data);
         }
+
         $app->locks->release($lockKey);
     }
 
@@ -209,23 +250,45 @@ self.addEventListener("notificationclick", function (event) {
      */
     public function getSubscriptionID(string $subscriberID, array $subscription): ?string
     {
+        $data = $this->getSubscriptionData($subscriberID, $subscription);
+        return $data !== null ? $data['id'] : null;
+    }
+
+    /**
+     * Returns the subscription ID for the subscription specified.
+     * 
+     * @param string $subscriberID The subscriber ID.
+     * @param array $subscription The subscription data.
+     * @return ?array Returns the subscription data or null if not found.
+     */
+    public function getSubscriptionData(string $subscriberID, array $subscription): ?array
+    {
         $data = $this->getSubscriberData($subscriberID);
         ksort($subscription);
         $subscriptionJSON = json_encode($subscription);
         foreach ($data['subscriptions'] as $subscriptionID => $otherSubscription) {
             if (is_array($otherSubscription) && isset($otherSubscription[0]) && $otherSubscription[0] === 2) { // v2
                 if (json_encode($otherSubscription[1]) === $subscriptionJSON) {
-                    return $subscriptionID;
+                    return [
+                        'id' => $subscriptionID,
+                        'channels' => isset($otherSubscription[4]) ? $otherSubscription[4] : []
+                    ];
                 }
-            } else {
+            } else { // v1
                 if (json_encode($otherSubscription) === $subscriptionJSON) {
-                    return $subscriptionID;
+                    return [
+                        'id' => $subscriptionID,
+                        'channels' => []
+                    ];
                 }
                 if (
                     isset($otherSubscription['endpoint']) && isset($subscription['endpoint']) && $otherSubscription['endpoint'] === $subscription['endpoint'] &&
                     isset($otherSubscription['key']) && isset($subscription['key']) && $otherSubscription['key'] === $subscription['key']
                 ) {
-                    return $subscriptionID;
+                    return [
+                        'id' => $subscriptionID,
+                        'channels' => []
+                    ];
                 }
             }
         }
@@ -259,7 +322,7 @@ self.addEventListener("notificationclick", function (event) {
         $initializeData[] = $app->urls->get('/ivopetkov-push-notifications-service-worker.js');
         // dev code        
         //$jsCode = file_get_contents(__DIR__ . '/../assets/pushNotifications.js') . "ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad;
-        $jsCode = "var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 8]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);";
+        $jsCode = "var script=document.createElement('script');script.src='" . $context->assets->getURL('assets/pushNotifications.min.js', ['cacheMaxAge' => 999999999, 'version' => 9]) . "';script.onload=function(){ivoPetkov.bearFrameworkAddons.pushNotifications.initialize(" . json_encode($initializeData) . ");" . $onLoad . "};document.head.appendChild(script);";
         $scriptHTML = '<html>'
             . '<head><link rel="client-packages"></head>'
             . '<body><script>' . $jsCode . '</script></body>'
@@ -281,7 +344,7 @@ self.addEventListener("notificationclick", function (event) {
      * 
      * @param string $subscriberID The subscriber ID.
      * @param \IvoPetkov\BearFrameworkAddons\PushNotifications\PushNotification $notification The push notification to send.
-     * @param array $options Available values: subscriptionIDs=>[]
+     * @param array $options Available values: subscriptionIDs=>[], channel=>''
      */
     public function send(string $subscriberID, PushNotification $notification, $options = []): void
     {
@@ -289,6 +352,7 @@ self.addEventListener("notificationclick", function (event) {
             throw new \Exception('The subscriptionIDs option must be of type array.');
         }
         $subscriptionIDs = isset($options['subscriptionIDs']) ? $options['subscriptionIDs'] : null;
+        $channel = isset($options['channel']) ? $options['channel'] : null;
         $data = $this->getSubscriberData($subscriberID);
         $subscriptionsIDsToDelete = [];
         foreach ($data['subscriptions'] as $subscriptionID => $subscriptionData) {
@@ -301,6 +365,10 @@ self.addEventListener("notificationclick", function (event) {
                 $subscription = $subscriptionData[1];
                 $vapidPublicKey = $subscriptionData[2];
                 $vapidPrivateKey = $subscriptionData[3];
+                $channels = isset($subscriptionData[4]) ? $subscriptionData[4] : [];
+                if ($channel !== null && array_search($channel, $channels) === false) {
+                    continue;
+                }
             } else {
                 $subscription = $subscriptionData;
                 $vapidPublicKey = null;
