@@ -145,7 +145,7 @@ self.addEventListener("notificationclick", function (event) {
         if (self::$newPushNotificationCache === null) {
             self::$newPushNotificationCache = new PushNotification();
         }
-        $pushNotification = clone (self::$newPushNotificationCache);
+        $pushNotification = clone(self::$newPushNotificationCache);
         if ($title !== null) {
             $pushNotification->title = $title;
         }
@@ -432,11 +432,10 @@ self.addEventListener("notificationclick", function (event) {
         }
         $data[0][] = $notificationData;
         $app->data->set($app->data->make($endpointDataKey, json_encode($data)));
-
         if ($vapidPublicKey !== null && $vapidPrivateKey !== null) {
             $webPush = new \Minishlink\WebPush\WebPush([
                 'VAPID' => [
-                    'subject' => 'ntf',
+                    'subject' => 'https://example.com',
                     'publicKey' => $vapidPublicKey,
                     'privateKey' => $vapidPrivateKey
                 ]
@@ -444,6 +443,12 @@ self.addEventListener("notificationclick", function (event) {
             $result = $webPush->sendOneNotification(\Minishlink\WebPush\Subscription::create($subscription), null);
             if ($result->isSubscriptionExpired()) {
                 return 'delete';
+            }
+            if ($result->isSuccess()) {
+                return true;
+            } else {
+                // $resultReason = $result->getReason();
+                return false;
             }
         } else {
             $urlParts = parse_url($endpoint);
