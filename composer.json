@@ -25,7 +25,7 @@
         "ivopetkov/server-requests-bearframework-addon": "1.*",
         "ivopetkov/locks-bearframework-addon": "1.*",
         "ivopetkov/client-packages-bearframework-addon": "1.*",
-        "minishlink/web-push": "9.*",
+        "minishlink/web-push": "10.*",
         "ext-gmp": "*"
     },
     "require-dev": {
