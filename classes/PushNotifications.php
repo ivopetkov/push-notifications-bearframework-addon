@@ -440,7 +440,10 @@ self.addEventListener("notificationclick", function (event) {
                     'privateKey' => $vapidPrivateKey
                 ]
             ]);
-            $result = $webPush->sendOneNotification(\Minishlink\WebPush\Subscription::create($subscription), null);
+            $options = [
+                'TTL' => '2419200' // Fix for "Since guzzlehttp/psr7 2.11: Passing int to GuzzleHttp\Psr7\Request::__construct() is deprecated; guzzlehttp/psr7 3.0 requires string|string[]"
+            ];
+            $result = $webPush->sendOneNotification(\Minishlink\WebPush\Subscription::create($subscription), null, $options);
             if ($result->isSubscriptionExpired()) {
                 return 'delete';
             }
